@@ -1,6 +1,7 @@
 {
   "auth": {
     "loginTitle": "Connexion à PromptHub",
+    "loginDescription": "Connectez-vous avec un compte existant.",
     "registerTitle": "Créer un compte",
     "username": "Nom d'utilisateur",
     "password": "Mot de passe",

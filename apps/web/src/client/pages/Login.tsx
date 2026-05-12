@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -54,7 +54,7 @@ export function LoginPage() {
           {t('auth.loginTitle')}
         </h2>
         <p className="setup-hint">
-          {t('auth.setupDescription')}
+          {t('auth.loginDescription')}
         </p>
 
         {error && <div className="login-error">{error}</div>}
@@ -92,6 +92,13 @@ export function LoginPage() {
             <span className="text-white">{t('auth.signIn')}</span>
           </button>
         </form>
+
+        <div className="auth-inline-actions auth-inline-actions-column">
+          <span className="setup-hint">{t('auth.needAccount')}</span>
+          <Link to="/register" className="auth-link-button auth-link-button-block">
+            {t('auth.register')}
+          </Link>
+        </div>
       </div>
     </div>
   );

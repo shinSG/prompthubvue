@@ -20,6 +20,13 @@ const envSchema = z.object({
 
   DATA_ROOT: z.string().default('./'),
 
+  DB_DRIVER: z.enum(['sqlite', 'postgres']).default('sqlite'),
+  DATABASE_URL: z.string().optional(),
+  DB_SSL: z.enum(['disable', 'require']).default('disable'),
+  DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DB_POOL_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+  DB_POOL_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+
   ALLOW_REGISTRATION: z
     .enum(['true', 'false'])
     .default('false')
@@ -41,6 +48,10 @@ function loadConfig(): Config {
   const env = parsed.data;
 
   const rootDir = path.resolve(env.DATA_ROOT);
+
+  if (env.DB_DRIVER === 'postgres' && !env.DATABASE_URL?.trim()) {
+    throw new Error('DATABASE_URL is required when DB_DRIVER=postgres');
+  }
 
   return {
     port: env.PORT,
@@ -68,6 +79,18 @@ function loadConfig(): Config {
 
     rootDir,
     dataDir: path.join(rootDir, 'data'),
+
+    database: {
+      driver: env.DB_DRIVER,
+      sqlitePath: path.join(rootDir, 'data', 'prompthub.db'),
+      postgresUrl: env.DATABASE_URL?.trim(),
+      ssl: env.DB_SSL === 'require' ? 'require' : false,
+      pool: {
+        max: env.DB_POOL_MAX,
+        idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT_MS,
+        connectionTimeoutMillis: env.DB_POOL_CONNECTION_TIMEOUT_MS,
+      },
+    },
 
     allowRegistration: env.ALLOW_REGISTRATION,
     logLevel: env.LOG_LEVEL,
@@ -101,6 +124,18 @@ export interface Config {
 
   rootDir: string;
   dataDir: string;
+
+  database: {
+    driver: 'sqlite' | 'postgres';
+    sqlitePath: string;
+    postgresUrl?: string;
+    ssl: false | 'require';
+    pool: {
+      max: number;
+      idleTimeoutMillis: number;
+      connectionTimeoutMillis: number;
+    };
+  };
 
   allowRegistration: boolean;
   logLevel: 'debug' | 'info' | 'warn' | 'error';

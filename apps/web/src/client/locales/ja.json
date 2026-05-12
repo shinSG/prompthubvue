@@ -1,6 +1,7 @@
 {
   "auth": {
     "loginTitle": "PromptHub にログイン",
+    "loginDescription": "作成済みのアカウントでサインインしてください。",
     "registerTitle": "アカウント作成",
     "username": "ユーザー名",
     "password": "パスワード",

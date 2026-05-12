@@ -1,0 +1,22 @@
+{
+  "theme": "system",
+  "language": "zh",
+  "autoSave": true,
+  "backgroundImageOpacity": 0.22,
+  "backgroundImageBlur": 14,
+  "customPlatformRootPaths": {},
+  "customSkillPlatformPaths": {},
+  "skillPlatformOrder": [],
+  "skillProjects": [],
+  "sync": {
+    "enabled": false,
+    "provider": "manual",
+    "autoSync": false
+  },
+  "device": {
+    "syncCadence": "manual",
+    "storeAutoSync": true,
+    "storeSyncCadence": "1d"
+  },
+  "updateChannel": "stable"
+}

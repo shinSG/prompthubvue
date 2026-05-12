@@ -2,6 +2,34 @@
 export { default as DatabaseAdapter } from "./adapter";
 export type { default as Database } from "./adapter";
 
+// Database configuration and trusted actor scope
+export {
+  createPostgresConfig,
+  createSqliteConfig,
+  normalizeDatabaseConfig,
+} from "./config";
+export type {
+  DatabaseConfig,
+  DatabaseDriver,
+  PostgresDatabaseConfig,
+  PostgresPoolConfig,
+  SqliteDatabaseConfig,
+} from "./config";
+export {
+  LOCAL_ACTOR,
+  LOCAL_USER_ID,
+  canReadOwnerScoped,
+  canWriteOwnerScoped,
+  createLocalActor,
+  resolveCreateOwner,
+} from "./scope";
+export type {
+  OwnerScopedRow,
+  OwnerVisibility,
+  TrustedActor,
+  UserRole,
+} from "./scope";
+
 // Schema
 export { SCHEMA_TABLES, SCHEMA_INDEXES, SCHEMA } from "./schema";
 

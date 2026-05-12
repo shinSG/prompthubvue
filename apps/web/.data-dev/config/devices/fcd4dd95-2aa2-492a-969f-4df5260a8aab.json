@@ -1,0 +1,22 @@
+[
+  {
+    "id": "c56be1d0-816c-4198-8bb3-45598da93a36",
+    "type": "browser",
+    "name": "Google Chrome",
+    "platform": "Windows",
+    "clientVersion": "self-hosted-web",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    "firstSeenAt": "2026-05-12T08:17:46.586Z",
+    "lastSeenAt": "2026-05-12T08:17:46.594Z"
+  },
+  {
+    "id": "46c30ef1-6eb6-4b30-99ec-d9a623c3bba0",
+    "type": "browser",
+    "name": "Google Chrome",
+    "platform": "Windows",
+    "clientVersion": "self-hosted-web",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    "firstSeenAt": "2026-05-12T08:02:53.056Z",
+    "lastSeenAt": "2026-05-12T08:03:42.718Z"
+  }
+]

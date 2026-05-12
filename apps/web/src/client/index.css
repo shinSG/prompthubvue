@@ -294,6 +294,44 @@ select {
     0 14px 30px rgba(37, 99, 235, 0.24) !important;
 }
 
+.auth-inline-actions {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.auth-inline-actions-column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.auth-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.auth-link-button-block {
+  width: 100%;
+  min-height: 2.75rem;
+  border-radius: 0.85rem;
+}
+
+.auth-link-button:hover {
+  background: #dbeafe;
+}
+
 .login-submit,
 .primary-button {
   display: inline-flex;

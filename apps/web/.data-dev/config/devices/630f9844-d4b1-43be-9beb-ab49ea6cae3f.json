@@ -1,0 +1,12 @@
+[
+  {
+    "id": "c56be1d0-816c-4198-8bb3-45598da93a36",
+    "type": "browser",
+    "name": "Google Chrome",
+    "platform": "Windows",
+    "clientVersion": "self-hosted-web",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+    "firstSeenAt": "2026-05-12T08:26:07.107Z",
+    "lastSeenAt": "2026-05-12T08:26:26.741Z"
+  }
+]

@@ -4,6 +4,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '../../package.json'), 'utf-8'));
+const serverPort = process.env.PORT ?? '3000';
 
 export default defineConfig({
   define: {
@@ -38,11 +39,11 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: `http://localhost:${serverPort}`,
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:3000',
+        target: `http://localhost:${serverPort}`,
         changeOrigin: true,
       },
     },

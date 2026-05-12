@@ -1,6 +1,7 @@
 {
   "auth": {
     "loginTitle": "登入 PromptHub",
+    "loginDescription": "請使用已建立的帳戶登入。",
     "registerTitle": "建立帳戶",
     "username": "使用者名稱",
     "password": "密碼",

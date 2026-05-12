@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LoginPage } from './pages/Login';
+import { RegisterPage } from './pages/Register';
 import { SetupPage } from './pages/Setup';
 import { DesktopWorkspacePage } from './pages/DesktopWorkspace';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -48,6 +49,7 @@ export function App() {
         <Routes>
           <Route path="/setup" element={<SetupRoute><SetupPage /></SetupRoute>} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/" element={<ProtectedRoute><DesktopWorkspacePage /></ProtectedRoute>} />
           <Route path="*" element={<ProtectedRoute><DesktopWorkspacePage /></ProtectedRoute>} />
         </Routes>

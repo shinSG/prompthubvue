@@ -1,0 +1,29 @@
+# Tasks
+
+- [x] 明确变更边界
+- [x] 完成 delta spec
+- [x] Phase 1: Database configuration scaffolding
+  - [x] Add database driver config types to `packages/db`
+  - [x] Export trusted actor and owner-scope helper types
+  - [x] Extend web environment config for SQLite/PostgreSQL selection
+  - [x] Keep SQLite as default and fail clearly for PostgreSQL until adapter is implemented
+- [ ] Phase 2: PostgreSQL adapter and migrations
+  - [ ] Add PostgreSQL dependency and connection pool
+  - [ ] Split SQLite and PostgreSQL schema/migrations
+  - [ ] Add migration lock/checksum tracking
+  - [ ] Add PostgreSQL search provider
+- [ ] Phase 3: Scoped repositories
+  - [ ] Implement prompt repository with trusted actor scope
+  - [ ] Implement folder repository with trusted actor scope
+  - [ ] Implement skill repository with trusted actor scope
+  - [ ] Audit rules, versions, settings, devices, backup, sync, media, and workspace services
+- [ ] Phase 4: Migration and desktop compatibility
+  - [ ] Add default local user backfill for desktop SQLite
+  - [ ] Add Web SQLite to PostgreSQL migration tooling
+  - [ ] Add migration verification reports
+- [ ] Phase 5: Verification and docs
+  - [ ] Add SQLite/PostgreSQL test matrix
+  - [ ] Add multi-user authorization and import/export security tests
+  - [ ] Update web self-hosting documentation
+  - [ ] Update implementation.md
+  - [ ] Sync stable specs / architecture / docs
