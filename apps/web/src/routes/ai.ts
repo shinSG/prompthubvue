@@ -9,6 +9,7 @@ import { requestRemoteBuffered, requestRemoteStream } from '../utils/remote-http
 
 const ai = new Hono();
 const modelConfigService = new ModelConfigService();
+const AI_PROXY_TIMEOUT_MS = 180_000;
 
 const requestSchema = z.object({
   requestId: z.string().trim().min(1).optional(),
@@ -166,6 +167,7 @@ async function executeBufferedRequest(request: AITransportRequest): Promise<AITr
       method: request.method,
       headers: request.headers,
       body: request.body,
+      timeoutMs: AI_PROXY_TIMEOUT_MS,
       allowedProtocols: ['https:', 'http:'],
     });
 
@@ -238,6 +240,7 @@ ai.post('/stream', async (c) => {
       method: request.method,
       headers: request.headers,
       body: request.body,
+      timeoutMs: AI_PROXY_TIMEOUT_MS,
       allowedProtocols: ['https:', 'http:'],
     });
 

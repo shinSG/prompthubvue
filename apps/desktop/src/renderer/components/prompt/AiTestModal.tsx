@@ -3,16 +3,19 @@ import { createPortal, flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PlayIcon, LoaderIcon, CopyIcon, CheckIcon, GitCompareIcon, ImageIcon, PlusIcon, DownloadIcon, BracesIcon, PaperclipIcon, XIcon, Maximize2Icon, Minimize2Icon } from 'lucide-react';
 import { CollapsibleThinking } from '../ui/CollapsibleThinking';
-import { chatCompletion, buildMessagesFromPrompt, multiModelCompare, AITestResult, generateImage, type ChatImageAttachment } from '../../services/ai';
+import { chatCompletion, buildMessagesFromPrompt, multiModelCompare, AITestResult, generateImage, type AIConfig, type ChatImageAttachment } from '../../services/ai';
 import { resolveScenarioModel } from '../../services/ai-defaults';
+import { getPromptVersions } from '../../services/database';
 import { useSettingsStore } from '../../stores/settings.store';
 import { useToast } from '../ui/Toast';
 import { LocalImage } from '../ui/LocalImage';
-import type { Prompt } from '@prompthub/shared/types';
+import type { Prompt, PromptVersion } from '@prompthub/shared/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
+
+type AiTestMode = 'single' | 'compare' | 'versionCompare' | 'image';
 
 interface AiTestModalProps {
   isOpen: boolean;
@@ -32,6 +35,17 @@ interface AiTestImageAttachment extends ChatImageAttachment {
   name: string;
   size: number;
   dataUrl: string;
+}
+
+interface VersionCompareResult {
+  versionId: string;
+  version: number;
+  createdAt: string;
+  success: boolean;
+  response?: string;
+  thinkingContent?: string;
+  error?: string;
+  latency: number;
 }
 
 const MAX_AI_TEST_IMAGES = 8;
@@ -57,7 +71,7 @@ export function AiTestModal({
 }: AiTestModalProps) {
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
-  const [mode, setMode] = useState<'single' | 'compare' | 'image'>('single');
+  const [mode, setMode] = useState<AiTestMode>('single');
   const [isExpanded, setIsExpanded] = useState(false);
   // Separate loading states for single model and multi-model
   // 分离单模型和多模型的 loading 状态
@@ -67,6 +81,13 @@ export function AiTestModal({
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [thinkingContent, setThinkingContent] = useState<string | null>(null);
   const [compareResults, setCompareResults] = useState<AITestResult[] | null>(null);
+  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([]);
+  const [hasLoadedPromptVersions, setHasLoadedPromptVersions] = useState(false);
+  const [isVersionLoading, setIsVersionLoading] = useState(false);
+  const [isVersionCompareLoading, setIsVersionCompareLoading] = useState(false);
+  const [selectedVersionIds, setSelectedVersionIds] = useState<string[]>([]);
+  const [selectedVersionCompareModelId, setSelectedVersionCompareModelId] = useState<string>('');
+  const [versionCompareResults, setVersionCompareResults] = useState<VersionCompareResult[] | null>(null);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
@@ -284,6 +305,27 @@ export function AiTestModal({
   const singleConfigForUi = useMemo(() => buildSingleConfig(), [buildSingleConfig]);
   const canRunSingleTest = !!(singleConfigForUi.apiKey && singleConfigForUi.apiUrl && singleConfigForUi.model);
 
+  const buildResponseFormat = useCallback(() => {
+    if (outputFormat === 'text') {
+      return undefined;
+    }
+
+    return {
+      type: outputFormat,
+      jsonSchema: outputFormat === 'json_schema' && jsonSchemaContent ? (() => {
+        try {
+          return {
+            name: jsonSchemaName || 'response',
+            strict: true,
+            schema: JSON.parse(jsonSchemaContent) as Record<string, unknown>,
+          };
+        } catch {
+          return undefined;
+        }
+      })() : undefined,
+    };
+  }, [jsonSchemaContent, jsonSchemaName, outputFormat]);
+
   // 替换变量
   const replaceVariables = useCallback((text: string): string => {
     return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
@@ -304,6 +346,49 @@ export function AiTestModal({
 
   const systemPrompt = useMemo(() => filledSystemPrompt ?? replaceVariables(baseSystemPrompt), [filledSystemPrompt, replaceVariables, baseSystemPrompt]);
   const userPrompt = useMemo(() => filledUserPrompt ?? replaceVariables(baseUserPrompt), [filledUserPrompt, replaceVariables, baseUserPrompt]);
+
+  const comparableVersions = useMemo(() => {
+    if (!prompt) return [];
+
+    const currentVersion: PromptVersion = {
+      id: 'current',
+      promptId: prompt.id,
+      version: prompt.version,
+      systemPrompt: prompt.systemPrompt,
+      systemPromptEn: prompt.systemPromptEn,
+      userPrompt: prompt.userPrompt,
+      userPromptEn: prompt.userPromptEn,
+      variables: prompt.variables || [],
+      note: t('prompt.currentVersion'),
+      aiResponse: prompt.lastAiResponse,
+      createdAt: prompt.updatedAt,
+    };
+
+    return [
+      currentVersion,
+      ...promptVersions.filter((version) => version.version !== prompt.version),
+    ].sort((a, b) => b.version - a.version);
+  }, [prompt, promptVersions, t]);
+
+  const selectedVersionCompareModel = useMemo(() => {
+    return compareModels.find((model) => model.id === selectedVersionCompareModelId) ?? defaultChatModel ?? null;
+  }, [compareModels, defaultChatModel, selectedVersionCompareModelId]);
+
+  const canRunVersionCompare = selectedVersionIds.length >= 2 && !!selectedVersionCompareModel && !isVersionCompareLoading;
+
+  const getVersionPromptTexts = useCallback((version: PromptVersion) => {
+    const versionSystemPrompt = preferEnglish
+      ? (version.systemPromptEn || version.systemPrompt || '')
+      : (version.systemPrompt || '');
+    const versionUserPrompt = preferEnglish
+      ? (version.userPromptEn || version.userPrompt)
+      : version.userPrompt;
+
+    return {
+      systemPrompt: replaceVariables(versionSystemPrompt),
+      userPrompt: replaceVariables(versionUserPrompt),
+    };
+  }, [preferEnglish, replaceVariables]);
 
   const readImageFileAsAttachment = useCallback((file: File): Promise<AiTestImageAttachment> => {
     return new Promise((resolve, reject) => {
@@ -424,6 +509,53 @@ export function AiTestModal({
     ];
   }, [selectedReferenceImages, testImageAttachments]);
 
+  const loadPromptVersions = useCallback(async () => {
+    if (!prompt || prompt.promptType === 'image') return;
+
+    setIsVersionLoading(true);
+    try {
+      const versions = await getPromptVersions(prompt.id);
+      setPromptVersions(versions);
+      setHasLoadedPromptVersions(true);
+    } catch (error) {
+      console.error('Failed to load prompt versions for comparison:', error);
+      setPromptVersions([]);
+      setHasLoadedPromptVersions(true);
+    } finally {
+      setIsVersionLoading(false);
+    }
+  }, [prompt]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'versionCompare' || !prompt || prompt.promptType === 'image') return;
+    if (hasLoadedPromptVersions) return;
+    void loadPromptVersions();
+  }, [hasLoadedPromptVersions, isOpen, loadPromptVersions, mode, prompt]);
+
+  useEffect(() => {
+    if (mode !== 'versionCompare') return;
+
+    setSelectedVersionIds((prev) => {
+      const validIds = new Set(comparableVersions.map((version) => version.id));
+      const filtered = prev.filter((id) => validIds.has(id));
+      if (filtered.length > 0 || comparableVersions.length < 2) {
+        return filtered;
+      }
+      return comparableVersions.slice(0, 2).map((version) => version.id);
+    });
+  }, [comparableVersions, mode]);
+
+  useEffect(() => {
+    if (mode !== 'versionCompare') return;
+
+    setSelectedVersionCompareModelId((prev) => {
+      if (prev && compareModels.some((model) => model.id === prev)) {
+        return prev;
+      }
+      return defaultChatModel?.id ?? compareModels[0]?.id ?? '';
+    });
+  }, [compareModels, defaultChatModel, mode]);
+
   // 重置状态
   useEffect(() => {
     if (isOpen && prompt) {
@@ -432,12 +564,19 @@ export function AiTestModal({
       setAiResponse(null);
       setThinkingContent(null);
       setCompareResults(null);
+      setPromptVersions([]);
+      setHasLoadedPromptVersions(false);
+      setSelectedVersionIds([]);
+      setSelectedVersionCompareModelId('');
+      setVersionCompareResults(null);
       setGeneratedImages([]);
       setTestImageAttachments([]);
       setSelectedReferenceImages(prompt.promptType === 'image' ? (prompt.images || []) : []);
       setIsSingleLoading(false);
       setIsCompareLoading(false);
       setIsImageLoading(false);
+      setIsVersionLoading(false);
+      setIsVersionCompareLoading(false);
       // 初始化变量值
       const initialValues: Record<string, string> = {};
       allVariables.forEach((v) => {
@@ -506,20 +645,7 @@ export function AiTestModal({
             : undefined,
           // Output format (Issue #38)
           // 输出格式
-          responseFormat: outputFormat === 'text' ? undefined : {
-            type: outputFormat,
-            jsonSchema: outputFormat === 'json_schema' && jsonSchemaContent ? (() => {
-              try {
-                return {
-                  name: jsonSchemaName || 'response',
-                  strict: true,
-                  schema: JSON.parse(jsonSchemaContent),
-                };
-              } catch {
-                return undefined;
-              }
-            })() : undefined,
-          },
+          responseFormat: buildResponseFormat(),
         }
       );
 
@@ -625,6 +751,89 @@ export function AiTestModal({
     } finally {
       resetCompareBuffers();
       setIsCompareLoading(false);
+    }
+  };
+
+  const toggleVersionSelection = (versionId: string) => {
+    setSelectedVersionIds((prev) =>
+      prev.includes(versionId)
+        ? prev.filter((id) => id !== versionId)
+        : [...prev, versionId]
+    );
+  };
+
+  const runVersionCompare = async () => {
+    if (!selectedVersionCompareModel || selectedVersionIds.length < 2) return;
+
+    setIsVersionCompareLoading(true);
+    setVersionCompareResults(null);
+
+    if (onUsageIncrement) {
+      onUsageIncrement(prompt.id);
+    }
+
+    const selectedVersions = comparableVersions.filter((version) => selectedVersionIds.includes(version.id));
+    const config: AIConfig = {
+      id: selectedVersionCompareModel.id,
+      provider: selectedVersionCompareModel.provider,
+      apiProtocol: selectedVersionCompareModel.apiProtocol,
+      apiKey: selectedVersionCompareModel.apiKey,
+      apiUrl: selectedVersionCompareModel.apiUrl,
+      model: selectedVersionCompareModel.model,
+      chatParams: selectedVersionCompareModel.chatParams,
+    };
+    const useStream = !!config.chatParams?.stream;
+    const useThinking = !!config.chatParams?.enableThinking;
+    const responseFormat = buildResponseFormat();
+    const nextResults: VersionCompareResult[] = [];
+
+    try {
+      for (const version of selectedVersions) {
+        const startedAt = Date.now();
+        try {
+          const promptTexts = getVersionPromptTexts(version);
+          const messages = buildMessagesFromPrompt(promptTexts.systemPrompt, promptTexts.userPrompt);
+          let streamedResponse = '';
+          let streamedThinkingContent = '';
+          const result = await chatCompletion(config, messages, {
+            stream: useStream,
+            enableThinking: useThinking,
+            streamCallbacks: useStream
+              ? {
+                onContent: (chunk) => {
+                  streamedResponse += chunk;
+                },
+                onThinking: (chunk) => {
+                  streamedThinkingContent += chunk;
+                },
+              }
+              : undefined,
+            responseFormat,
+          });
+
+          nextResults.push({
+            versionId: version.id,
+            version: version.version,
+            createdAt: version.createdAt,
+            success: true,
+            response: streamedResponse || result.content,
+            thinkingContent: streamedThinkingContent || result.thinkingContent,
+            latency: Date.now() - startedAt,
+          });
+        } catch (error) {
+          nextResults.push({
+            versionId: version.id,
+            version: version.version,
+            createdAt: version.createdAt,
+            success: false,
+            error: error instanceof Error ? error.message : t('common.error'),
+            latency: Date.now() - startedAt,
+          });
+        }
+        setVersionCompareResults([...nextResults]);
+      }
+    } finally {
+      setIsVersionCompareLoading(false);
     }
   };
 
@@ -821,6 +1030,16 @@ export function AiTestModal({
               >
                 <GitCompareIcon className="w-4 h-4" />
                 {t('settings.multiModelCompare')}
+              </button>
+              <button
+                onClick={() => setMode('versionCompare')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'versionCompare'
+                  ? 'bg-primary text-white'
+                  : 'bg-muted text-muted-foreground hover:bg-accent'
+                  }`}
+              >
+                <GitCompareIcon className="w-4 h-4" />
+                {t('prompt.versionResultCompare')}
               </button>
             </>
           )}
@@ -1151,6 +1370,115 @@ export function AiTestModal({
                     {res.success && res.thinkingContent && (
                       <CollapsibleThinking
                         content={res.thinkingContent}
+                        className="mt-2"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode === 'versionCompare' && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">
+                {t('prompt.selectVersionsHint')}
+              </h4>
+              {isVersionLoading ? (
+                <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/30">
+                  {t('prompt.historyLoading')}
+                </div>
+              ) : comparableVersions.length < 2 ? (
+                <div className="text-sm text-muted-foreground p-3 rounded-lg bg-muted/30">
+                  {t('prompt.versionCompareNoHistory')}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {comparableVersions.map((version) => (
+                    <button
+                      key={version.id}
+                      onClick={() => toggleVersionSelection(version.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedVersionIds.includes(version.id)
+                        ? 'bg-primary text-white'
+                        : 'bg-muted text-muted-foreground hover:bg-accent'
+                        }`}
+                    >
+                      {t('prompt.versionShortLabel', { version: version.version })}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">
+                {t('prompt.selectSingleModelHint')}
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {compareModels.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => setSelectedVersionCompareModelId(model.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedVersionCompareModel?.id === model.id
+                      ? 'bg-primary text-white'
+                      : 'bg-muted text-muted-foreground hover:bg-accent'
+                      }`}
+                  >
+                    {model.name || model.model}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-muted-foreground">
+                {selectedVersionIds.length < 2
+                  ? t('prompt.versionCompareNeedTwo')
+                  : t('prompt.compareVersions', { count: selectedVersionIds.length })}
+              </span>
+              <button
+                onClick={runVersionCompare}
+                disabled={!canRunVersionCompare}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {isVersionCompareLoading ? (
+                  <LoaderIcon className="w-4 h-4 animate-spin" />
+                ) : (
+                  <GitCompareIcon className="w-4 h-4" />
+                )}
+                {isVersionCompareLoading ? t('prompt.comparingVersions') : t('prompt.compareVersions', { count: selectedVersionIds.length })}
+              </button>
+            </div>
+
+            {versionCompareResults && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                {versionCompareResults.map((result) => (
+                  <div
+                    key={result.versionId}
+                    className={`p-3 rounded-lg border ${result.success ? 'border-border app-wallpaper-surface' : 'border-destructive/50 bg-destructive/5'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="min-w-0">
+                        <span className="text-xs font-medium truncate">
+                          {t('prompt.versionShortLabel', { version: result.version })}
+                        </span>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {new Date(result.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{result.latency}ms</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground max-h-48 overflow-y-auto">
+                      {result.success
+                        ? (renderAiResponseContent(result.response || t('prompt.emptyResponse')) ?? t('prompt.emptyResponse'))
+                        : (result.error || t('common.error'))}
+                    </div>
+                    {result.success && result.thinkingContent && (
+                      <CollapsibleThinking
+                        content={result.thinkingContent}
                         className="mt-2"
                       />
                     )}

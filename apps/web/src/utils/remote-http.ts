@@ -160,7 +160,7 @@ async function resolvePublicAddress(hostname: string): Promise<ResolvedAddress> 
     throw new Error('Access to internal network addresses is not allowed');
   }
 
-  const first = addresses[0];
+  const first = addresses.find((entry) => entry.family === 4) ?? addresses[0];
   return { address: first.address, family: first.family === 6 ? 6 : 4 };
 }
 

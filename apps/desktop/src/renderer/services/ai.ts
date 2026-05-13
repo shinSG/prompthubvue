@@ -332,13 +332,14 @@ function getAITransport() {
 }
 
 function createResponseLike(response: AITransportResponse): ResponseLike {
+  const body = response.body || (response.error ? JSON.stringify({ error: { message: response.error } }) : '');
   return {
     ok: response.ok,
     status: response.status,
     statusText: response.statusText,
     headers: response.headers,
-    text: async () => response.body,
-    json: async <T = unknown>() => JSON.parse(response.body) as T,
+    text: async () => body,
+    json: async <T = unknown>() => JSON.parse(body) as T,
   };
 }
 

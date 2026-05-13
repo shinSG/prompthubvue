@@ -205,6 +205,30 @@ describe("ai transport", () => {
     ]);
   });
 
+  it("surfaces transport error messages for status-zero AI proxy failures", async () => {
+    window.api.ai.request.mockResolvedValue({
+      ok: false,
+      status: 0,
+      statusText: "",
+      body: "",
+      headers: {},
+      error: "Remote request timed out",
+    });
+
+    await expect(
+      chatCompletion(
+        {
+          provider: "openai",
+          apiProtocol: "openai",
+          apiKey: "test-key",
+          apiUrl: "https://api.example.com",
+          model: "gpt-test",
+        },
+        [{ role: "user", content: "Say hello" }],
+      ),
+    ).rejects.toThrow("Remote request timed out");
+  });
+
   it("uses Authorization bearer for Gemini OpenAI-compatible chat completions", async () => {
     window.api.ai.request.mockResolvedValue({
       ok: true,

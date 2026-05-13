@@ -255,6 +255,42 @@ describe('remote-http', () => {
     expect(httpsRequestMock).not.toHaveBeenCalled();
   });
 
+  it('prefers public IPv4 DNS results when IPv6 is listed first', async () => {
+    setLookupResult([
+      { address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
+      { address: '93.184.216.34', family: 4 },
+    ]);
+
+    const response = createResponse({
+      statusCode: 200,
+      statusMessage: 'OK',
+      headers: { 'content-type': 'application/json' },
+    });
+
+    setRequestScenarios(httpsRequestMock, [
+      {
+        onEnd: (_request, callback) => {
+          callback(response);
+          queueMicrotask(() => response.end('{"ok":true}'));
+        },
+      },
+    ]);
+
+    await requestRemoteBuffered({
+      url: 'https://example.com/ai',
+      method: 'POST',
+    });
+
+    expect(httpsRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostname: '93.184.216.34',
+        family: 4,
+        servername: 'example.com',
+      }),
+      expect.any(Function),
+    );
+  });
+
   it('follows redirects until the final successful response', async () => {
     setLookupResult([{ address: '93.184.216.34', family: 4 }]);
 

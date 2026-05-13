@@ -38,6 +38,8 @@ async function createTestApp(
   options?: {
     mockRemoteBufferedResult?: MockRemoteBufferedResponse | Error;
     mockRemoteStreamResult?: MockRemoteStreamResponse | Error;
+    onBufferedRequest?: (request: unknown) => void;
+    onStreamRequest?: (request: unknown) => void;
   },
 ) {
   process.env.PORT = '3998';
@@ -50,7 +52,8 @@ async function createTestApp(
   process.env.LOG_LEVEL = 'debug';
 
   vi.doMock('../utils/remote-http.js', () => ({
-    requestRemoteBuffered: vi.fn(async () => {
+    requestRemoteBuffered: vi.fn(async (request: unknown) => {
+      options?.onBufferedRequest?.(request);
       const result = options?.mockRemoteBufferedResult;
       if (result instanceof Error) {
         throw result;
@@ -60,7 +63,8 @@ async function createTestApp(
       }
       return result;
     }),
-    requestRemoteStream: vi.fn(async () => {
+    requestRemoteStream: vi.fn(async (request: unknown) => {
+      options?.onStreamRequest?.(request);
       const result = options?.mockRemoteStreamResult;
       if (result instanceof Error) {
         throw result;
@@ -350,6 +354,55 @@ describe('web ai routes', () => {
         code: 'INTERNAL_ERROR',
         message: 'stream exploded',
       });
+    } finally {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  }, TEST_TIMEOUT);
+
+  it('returns buffered transport failures with diagnostics and extended timeout', async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompthub-web-ai-test-'));
+    const bufferedRequests: unknown[] = [];
+
+    try {
+      const app = await createTestApp(dataDir, {
+        mockRemoteBufferedResult: new Error('Remote request timed out'),
+        mockRemoteStreamResult: {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'text/event-stream' },
+          body: createStreamBody('data: unused\n\n'),
+          finalUrl: 'https://example.com/ai',
+        },
+        onBufferedRequest: (request) => bufferedRequests.push(request),
+      });
+      const { payload } = await registerUser(app, 'aitimeout', 'debugpass001');
+
+      const response = await app.request(
+        new Request('http://local/api/ai/request', {
+          method: 'POST',
+          headers: authHeaders(payload.data.accessToken),
+          body: JSON.stringify({
+            method: 'POST',
+            url: 'https://example.com/ai',
+            body: '{"prompt":"slow"}',
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const responsePayload = (await response.json()) as {
+        data: {
+          ok: boolean;
+          status: number;
+          error?: string;
+        };
+      };
+      expect(responsePayload.data).toMatchObject({
+        ok: false,
+        status: 0,
+        error: 'Remote request timed out',
+      });
+      expect(bufferedRequests[0]).toMatchObject({ timeoutMs: 180_000 });
     } finally {
       fs.rmSync(dataDir, { recursive: true, force: true });
     }

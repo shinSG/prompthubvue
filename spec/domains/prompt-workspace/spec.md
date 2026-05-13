@@ -15,6 +15,7 @@
 
 - Prompt 文件夹结构和版本快照属于稳定产品能力。
 - 文件夹表达、Prompt 元数据与版本目录的设计应支持后续导入导出、同步和恢复。
+- Prompt AI 测试界面应支持在同一聊天模型下对同一 Prompt 的多个文本版本进行临时结果对比；该对比不改变版本快照、Prompt 当前内容或模型配置。
 
 ### 3. Stable Internal Sources
 
@@ -35,3 +36,12 @@ When prompt file layout, metadata contract, or versioning semantics change mater
 When another system feature relies on prompt storage semantics:
 
 - it should treat this spec and the linked architecture docs as the current truth source
+
+### Scenario: User compares Prompt version outputs
+
+When a user compares multiple text versions of the same Prompt in the AI test surface:
+
+- the selected versions are executed against one selected chat model
+- the same filled variable values are applied to every selected version
+- results are displayed transiently per version
+- comparison responses are not persisted to Prompt or PromptVersion records
