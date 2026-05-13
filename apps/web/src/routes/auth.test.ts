@@ -517,6 +517,37 @@ describe('web auth routes', () => {
     }
   }, TEST_TIMEOUT);
 
+  it('allows logout without an access token and invalidates refresh token', async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompthub-web-auth-test-'));
+
+    try {
+      const app = await createTestApp(dataDir);
+      const { payload: registerPayload } = await registerUser(app, 'logoutnoaccess', 'debugpass001');
+
+      const logoutResponse = await app.request(
+        new Request('http://local/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: registerPayload.data.refreshToken }),
+        }),
+      );
+
+      expect(logoutResponse.status).toBe(200);
+
+      const refreshAfterLogout = await app.request(
+        new Request('http://local/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: registerPayload.data.refreshToken }),
+        }),
+      );
+
+      expect(refreshAfterLogout.status).toBe(401);
+    } finally {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  }, TEST_TIMEOUT);
+
   it('changes password and rejects the old password afterward', async () => {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompthub-web-auth-test-'));
 

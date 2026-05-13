@@ -47,7 +47,6 @@ const passwordChangeSchema = z.object({
   newPassword: passwordSchema,
 });
 
-auth.use('/logout', authMiddleware());
 auth.use('/me', authMiddleware());
 auth.use('/password', authMiddleware());
 auth.use('*', async (c, next) => {
@@ -208,13 +207,11 @@ auth.post('/logout', async (c) => {
   }
 
   try {
-    const { userId } = getAuthUser(c);
     const refreshToken = parsed.data.refreshToken ?? getRefreshTokenFromCookie(c);
-    if (!refreshToken) {
-      return error(c, 422, ErrorCode.VALIDATION_ERROR, 'refreshToken is required');
+    if (refreshToken) {
+      await authService.logoutByRefreshToken(refreshToken);
     }
 
-    await authService.logout(userId, refreshToken);
     clearAuthCookies(c);
     return success(c, { ok: true });
   } catch (routeError) {

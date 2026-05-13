@@ -213,6 +213,27 @@ export class AuthService {
     this.deleteRefreshTokenById(tokenId);
   }
 
+  async logoutByRefreshToken(refreshToken: string): Promise<void> {
+    await this.cleanupExpiredRefreshTokens();
+
+    try {
+      const { payload } = await this.verifyToken(refreshToken, 'refresh');
+      const tokenId = this.getRequiredStringClaim(payload.jti, 'jti');
+      this.deleteRefreshTokenById(tokenId);
+    } catch (serviceError) {
+      // Logout should stay idempotent: if the refresh token is missing/expired/invalid,
+      // we still treat the request as successful and clear client cookies.
+      if (
+        serviceError instanceof AuthServiceError
+        && serviceError.status === 401
+        && serviceError.code === ErrorCode.UNAUTHORIZED
+      ) {
+        return;
+      }
+      throw serviceError;
+    }
+  }
+
   getCurrentUser(userId: string): AuthUser {
     const user = this.requireUserById(userId);
     return this.toAuthUser(user);

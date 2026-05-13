@@ -354,4 +354,90 @@ describe('web ai routes', () => {
       fs.rmSync(dataDir, { recursive: true, force: true });
     }
   }, TEST_TIMEOUT);
+
+  it('enforces user-scoped modelId resolution for AI requests', async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompthub-web-ai-test-'));
+
+    try {
+      const app = await createTestApp(dataDir, {
+        mockRemoteBufferedResult: {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/json' },
+          body: Buffer.from('{"reply":"scoped"}', 'utf-8'),
+          finalUrl: 'https://example.com/ai',
+        },
+        mockRemoteStreamResult: {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'text/event-stream' },
+          body: createStreamBody('data: scoped\n\n'),
+          finalUrl: 'https://example.com/ai',
+        },
+      });
+
+      const { payload: owner } = await registerUser(app, 'aiscoped-owner', 'debugpass001');
+      const { payload: other } = await registerUser(app, 'aiscoped-other', 'debugpass001');
+
+      const upsert = await app.request(
+        new Request('http://local/api/model-configs/m-chat-1', {
+          method: 'PUT',
+          headers: authHeaders(owner.data.accessToken),
+          body: JSON.stringify({
+            id: 'm-chat-1',
+            type: 'chat',
+            provider: 'openai',
+            apiProtocol: 'openai',
+            apiKey: 'sk-owner',
+            apiUrl: 'https://api.openai.com',
+            model: 'gpt-4o-mini',
+            isDefault: true,
+          }),
+        }),
+      );
+      expect(upsert.status).toBe(200);
+
+      const denied = await app.request(
+        new Request('http://local/api/ai/request', {
+          method: 'POST',
+          headers: authHeaders(other.data.accessToken),
+          body: JSON.stringify({
+            method: 'POST',
+            url: 'https://example.com/ai',
+            modelId: 'm-chat-1',
+            body: JSON.stringify({ model: 'ignored' }),
+          }),
+        }),
+      );
+
+      expect(denied.status).toBe(404);
+      const deniedPayload = await denied.json() as { error: { code: string; message: string } };
+      expect(deniedPayload.error.code).toBe('NOT_FOUND');
+
+      const allowed = await app.request(
+        new Request('http://local/api/ai/request', {
+          method: 'POST',
+          headers: authHeaders(owner.data.accessToken),
+          body: JSON.stringify({
+            method: 'POST',
+            url: 'https://example.com/ai',
+            modelId: 'm-chat-1',
+            body: JSON.stringify({ model: 'ignored' }),
+          }),
+        }),
+      );
+
+      expect(allowed.status).toBe(200);
+      const allowedPayload = await allowed.json() as {
+        data: {
+          ok: boolean;
+          body: string;
+        };
+      };
+      expect(allowedPayload.data.ok).toBe(true);
+      expect(allowedPayload.data.body).toBe('{"reply":"scoped"}');
+    } finally {
+      fs.rmSync(dataDir, { recursive: true, force: true });
+    }
+  }, TEST_TIMEOUT);
 });

@@ -162,11 +162,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentToken = token;
     const currentRefreshToken = refreshToken;
 
-    if (currentToken && currentRefreshToken) {
-      try {
-        await apiLogout(currentToken, currentRefreshToken);
-      } catch {
-      }
+    try {
+      await apiLogout(currentToken, currentRefreshToken);
+    } catch {
     }
 
     clearSession();

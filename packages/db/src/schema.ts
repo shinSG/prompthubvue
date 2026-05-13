@@ -165,6 +165,33 @@ CREATE TABLE IF NOT EXISTS user_settings (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (user_id, key)
 );
+
+CREATE TABLE IF NOT EXISTS user_ai_models (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,
+  model_type TEXT NOT NULL CHECK(model_type IN ('chat', 'image')),
+  name TEXT,
+  provider TEXT NOT NULL,
+  api_protocol TEXT NOT NULL CHECK(api_protocol IN ('openai', 'gemini', 'anthropic')),
+  api_key TEXT NOT NULL,
+  api_url TEXT NOT NULL,
+  model TEXT NOT NULL,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  chat_params TEXT,
+  image_params TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, id)
+);
+
+CREATE TABLE IF NOT EXISTS user_ai_scenario_defaults (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scenario TEXT NOT NULL CHECK(scenario IN ('quickAdd', 'promptTest', 'imageTest', 'translation')),
+  model_id TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, scenario),
+  FOREIGN KEY (user_id, model_id) REFERENCES user_ai_models(user_id, id) ON DELETE CASCADE
+);
 `;
 
 /**
@@ -196,6 +223,10 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_user_settings_user ON user_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_ai_models_user ON user_ai_models(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_ai_models_type ON user_ai_models(user_id, model_type);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_ai_models_default_per_type ON user_ai_models(user_id, model_type) WHERE is_default = 1;
+CREATE INDEX IF NOT EXISTS idx_user_ai_scenario_defaults_user ON user_ai_scenario_defaults(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_prompts_pinned ON prompts(is_pinned);
 CREATE INDEX IF NOT EXISTS idx_prompts_created ON prompts(created_at DESC);

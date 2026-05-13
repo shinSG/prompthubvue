@@ -523,6 +523,29 @@ function syncSettingsToMain(settings: Partial<Settings>): void {
     );
 }
 
+function syncAiSettingsToMain(state: Pick<
+  SettingsState,
+  | "aiProvider"
+  | "aiApiProtocol"
+  | "aiApiKey"
+  | "aiApiUrl"
+  | "aiModel"
+  | "aiModels"
+  | "scenarioModelDefaults"
+>): void {
+  const payload = {
+    aiProvider: state.aiProvider,
+    aiApiProtocol: state.aiApiProtocol,
+    aiApiKey: state.aiApiKey,
+    aiApiUrl: state.aiApiUrl,
+    aiModel: state.aiModel,
+    aiModels: state.aiModels,
+    scenarioModelDefaults: state.scenarioModelDefaults,
+  };
+
+  syncSettingsToMain(payload as Partial<Settings>);
+}
+
 function sanitizeGithubToken(token: string): string {
   return token.replace(/[\r\n\x00-\x1f\x7f]/g, "").trim();
 }
@@ -557,10 +580,48 @@ export async function loadSettingsFromMainProcess(): Promise<void> {
       : state.minimizeOnLaunch;
   const githubToken = sanitizeGithubToken(settings.githubToken ?? "");
 
+  const aiModels = Array.isArray((settings as { aiModels?: unknown }).aiModels)
+    ? ((settings as { aiModels: AIModelConfig[] }).aiModels ?? [])
+    : [];
+  const scenarioModelDefaults =
+    (settings as { scenarioModelDefaults?: ScenarioModelDefaults })
+      .scenarioModelDefaults ?? {};
+
+  let aiProvider = state.aiProvider;
+  let aiApiProtocol = state.aiApiProtocol;
+  let aiApiKey = state.aiApiKey;
+  let aiApiUrl = state.aiApiUrl;
+  let aiModel = state.aiModel;
+
+  const chatDefaultFromScenario =
+    scenarioModelDefaults.promptTest ??
+    scenarioModelDefaults.quickAdd ??
+    scenarioModelDefaults.translation;
+  const defaultChatModel = aiModels.find(
+    (model) => (model.type ?? "chat") === "chat" && model.id === chatDefaultFromScenario,
+  )
+    ?? aiModels.find((model) => (model.type ?? "chat") === "chat" && model.isDefault)
+    ?? aiModels.find((model) => (model.type ?? "chat") === "chat");
+
+  if (defaultChatModel) {
+    aiProvider = defaultChatModel.provider;
+    aiApiProtocol = defaultChatModel.apiProtocol;
+    aiApiKey = defaultChatModel.apiKey;
+    aiApiUrl = defaultChatModel.apiUrl;
+    aiModel = defaultChatModel.model;
+  }
+
   useSettingsStore.setState({
     launchAtStartup,
     minimizeOnLaunch,
     githubToken,
+    aiProvider,
+    aiApiProtocol,
+    aiApiKey,
+    aiApiUrl,
+    aiModel,
+    aiModels,
+    scenarioModelDefaults,
   });
 
   if (typeof settings.launchAtStartup !== "boolean") {
@@ -1026,6 +1087,9 @@ export const useSettingsStore = create<SettingsState>()(
               aiModel: config.model,
             });
           }
+
+          const nextState = get();
+          syncAiSettingsToMain(nextState);
         },
 
         updateAiModel: (id, config) => {
@@ -1044,6 +1108,9 @@ export const useSettingsStore = create<SettingsState>()(
               aiModel: updated.model,
             });
           }
+
+          const nextState = get();
+          syncAiSettingsToMain(nextState);
         },
 
         deleteAiModel: (id) => {
@@ -1070,6 +1137,9 @@ export const useSettingsStore = create<SettingsState>()(
             });
           }
           setTouched({ aiModels: remaining, scenarioModelDefaults });
+
+          const nextState = get();
+          syncAiSettingsToMain(nextState);
         },
 
         setDefaultAiModel: (id) => {
@@ -1098,6 +1168,9 @@ export const useSettingsStore = create<SettingsState>()(
               aiModel: targetModel.model,
             });
           }
+
+          const nextState = get();
+          syncAiSettingsToMain(nextState);
         },
 
         setScenarioModelDefault: (scenario, modelId) => {
@@ -1108,6 +1181,9 @@ export const useSettingsStore = create<SettingsState>()(
             delete nextDefaults[scenario];
           }
           setTouched({ scenarioModelDefaults: nextDefaults });
+
+          const nextState = get();
+          syncAiSettingsToMain(nextState);
         },
 
         applyTheme: () => {

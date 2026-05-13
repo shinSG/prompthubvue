@@ -759,6 +759,10 @@ export async function chatCompletion(
     response?: ResponseLike;
   }> => {
     const requestBody = JSON.stringify(body);
+    const transportHeaders =
+      transport && config.id
+        ? { ...headers, 'X-PromptHub-Model-Id': config.id }
+        : headers;
 
     if (mergedParams.stream && transport) {
       const streamState = createStreamState();
@@ -768,7 +772,7 @@ export async function chatCompletion(
         {
           method: "POST",
           url: endpoint,
-          headers,
+          headers: transportHeaders,
           body: requestBody,
         },
         {
@@ -814,7 +818,7 @@ export async function chatCompletion(
       const response = await transport.request({
         method: "POST",
         url: endpoint,
-        headers,
+        headers: transportHeaders,
         body: requestBody,
       });
       return { response: createResponseLike(response) };

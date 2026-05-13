@@ -13,6 +13,169 @@ interface PragmaColumnInfo {
   pk: number;
 }
 
+type LegacySettingBundle = {
+  aiModels: unknown;
+  scenarioModelDefaults: unknown;
+  aiProvider: unknown;
+  aiApiProtocol: unknown;
+  aiApiKey: unknown;
+  aiApiUrl: unknown;
+  aiModel: unknown;
+};
+
+type MigratedAIModelRow = {
+  id: string;
+  modelType: "chat" | "image";
+  name: string | null;
+  provider: string;
+  apiProtocol: "openai" | "gemini" | "anthropic";
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  isDefault: number;
+  chatParams: string | null;
+  imageParams: string | null;
+};
+
+const AI_SCENARIOS = new Set(["quickAdd", "promptTest", "imageTest", "translation"]);
+
+function parseStoredSettingValue(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function inferProtocol(provider: string | null, apiUrl: string | null): "openai" | "gemini" | "anthropic" {
+  const providerLower = (provider || "").toLowerCase();
+  const urlLower = (apiUrl || "").toLowerCase();
+
+  if (providerLower === "anthropic" || urlLower.includes("api.anthropic.com")) {
+    return "anthropic";
+  }
+
+  if (
+    providerLower === "google" ||
+    providerLower === "gemini" ||
+    urlLower.includes("generativelanguage.googleapis.com")
+  ) {
+    return "gemini";
+  }
+
+  return "openai";
+}
+
+function normalizeProtocol(value: unknown, provider: string | null, apiUrl: string | null): "openai" | "gemini" | "anthropic" {
+  if (value === "openai" || value === "gemini" || value === "anthropic") {
+    return value;
+  }
+  return inferProtocol(provider, apiUrl);
+}
+
+function stringifyJsonObject(value: unknown): string | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeModelRowsForUser(userId: string, settings: LegacySettingBundle): MigratedAIModelRow[] {
+  const rows: MigratedAIModelRow[] = [];
+
+  const aiModels = Array.isArray(settings.aiModels) ? settings.aiModels : [];
+  for (let index = 0; index < aiModels.length; index += 1) {
+    const candidate = aiModels[index];
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+
+    const modelObj = candidate as Record<string, unknown>;
+    const provider = toNonEmptyString(modelObj.provider);
+    const apiKey = toNonEmptyString(modelObj.apiKey);
+    const apiUrl = toNonEmptyString(modelObj.apiUrl);
+    const model = toNonEmptyString(modelObj.model);
+
+    if (!provider || !apiKey || !apiUrl || !model) {
+      continue;
+    }
+
+    const id = toNonEmptyString(modelObj.id) || `migrated-${index + 1}`;
+    const modelType = modelObj.type === "image" ? "image" : "chat";
+
+    rows.push({
+      id,
+      modelType,
+      name: toNonEmptyString(modelObj.name),
+      provider,
+      apiProtocol: normalizeProtocol(modelObj.apiProtocol, provider, apiUrl),
+      apiKey,
+      apiUrl,
+      model,
+      isDefault: modelObj.isDefault === true ? 1 : 0,
+      chatParams: stringifyJsonObject(modelObj.chatParams),
+      imageParams: stringifyJsonObject(modelObj.imageParams),
+    });
+  }
+
+  const hasDefaultByType = new Set(rows.filter((row) => row.isDefault === 1).map((row) => row.modelType));
+  for (const type of ["chat", "image"] as const) {
+    if (hasDefaultByType.has(type)) {
+      continue;
+    }
+    const first = rows.find((row) => row.modelType === type);
+    if (first) {
+      first.isDefault = 1;
+    }
+  }
+
+  if (rows.length === 0) {
+    const provider = toNonEmptyString(settings.aiProvider);
+    const apiKey = toNonEmptyString(settings.aiApiKey);
+    const apiUrl = toNonEmptyString(settings.aiApiUrl);
+    const model = toNonEmptyString(settings.aiModel);
+
+    if (provider && apiKey && apiUrl && model) {
+      rows.push({
+        id: "legacy-default",
+        modelType: "chat",
+        name: "Migrated Legacy Model",
+        provider,
+        apiProtocol: normalizeProtocol(settings.aiApiProtocol, provider, apiUrl),
+        apiKey,
+        apiUrl,
+        model,
+        isDefault: 1,
+        chatParams: null,
+        imageParams: null,
+      });
+    }
+  }
+
+  const deduped = new Map<string, MigratedAIModelRow>();
+  for (const row of rows) {
+    const scopedId = `${userId}:${row.id}`;
+    if (!deduped.has(scopedId)) {
+      deduped.set(scopedId, row);
+    }
+  }
+
+  return Array.from(deduped.values());
+}
+
 /**
  * Hook functions that allow the host application to inject environment-specific
  * behaviour into the database initialization process.
@@ -409,6 +572,121 @@ export function initDatabase(
           PRIMARY KEY (user_id, key)
         )
       `);
+    }
+
+    if (!hasMigration("user_ai_model_tables_v1")) {
+      db!.exec(`
+        CREATE TABLE IF NOT EXISTS user_ai_models (
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          id TEXT NOT NULL,
+          model_type TEXT NOT NULL CHECK(model_type IN ('chat', 'image')),
+          name TEXT,
+          provider TEXT NOT NULL,
+          api_protocol TEXT NOT NULL CHECK(api_protocol IN ('openai', 'gemini', 'anthropic')),
+          api_key TEXT NOT NULL,
+          api_url TEXT NOT NULL,
+          model TEXT NOT NULL,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          chat_params TEXT,
+          image_params TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          PRIMARY KEY (user_id, id)
+        );
+
+        CREATE TABLE IF NOT EXISTS user_ai_scenario_defaults (
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          scenario TEXT NOT NULL CHECK(scenario IN ('quickAdd', 'promptTest', 'imageTest', 'translation')),
+          model_id TEXT NOT NULL,
+          updated_at INTEGER NOT NULL,
+          PRIMARY KEY (user_id, scenario),
+          FOREIGN KEY (user_id, model_id) REFERENCES user_ai_models(user_id, id) ON DELETE CASCADE
+        );
+      `);
+      markMigration("user_ai_model_tables_v1");
+    }
+
+    if (!hasMigration("backfill_user_ai_models_from_user_settings_v1")) {
+      const rows = db!
+        .prepare(
+          `SELECT user_id, key, value
+           FROM user_settings
+           WHERE key IN ('aiModels', 'scenarioModelDefaults', 'aiProvider', 'aiApiProtocol', 'aiApiKey', 'aiApiUrl', 'aiModel')`,
+        )
+        .all() as Array<{ user_id: string; key: string; value: string }>;
+
+      const perUser = new Map<string, LegacySettingBundle>();
+      for (const row of rows) {
+        const current = perUser.get(row.user_id) ?? {
+          aiModels: undefined,
+          scenarioModelDefaults: undefined,
+          aiProvider: undefined,
+          aiApiProtocol: undefined,
+          aiApiKey: undefined,
+          aiApiUrl: undefined,
+          aiModel: undefined,
+        };
+        current[row.key as keyof LegacySettingBundle] = parseStoredSettingValue(row.value);
+        perUser.set(row.user_id, current);
+      }
+
+      const deleteDefaultsStmt = db!.prepare("DELETE FROM user_ai_scenario_defaults WHERE user_id = ?");
+      const deleteModelsStmt = db!.prepare("DELETE FROM user_ai_models WHERE user_id = ?");
+      const insertModelStmt = db!.prepare(`
+        INSERT INTO user_ai_models (
+          user_id, id, model_type, name, provider, api_protocol,
+          api_key, api_url, model, is_default, chat_params, image_params,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const insertScenarioStmt = db!.prepare(`
+        INSERT OR REPLACE INTO user_ai_scenario_defaults (user_id, scenario, model_id, updated_at)
+        VALUES (?, ?, ?, ?)
+      `);
+
+      for (const [userId, settings] of perUser.entries()) {
+        const models = normalizeModelRowsForUser(userId, settings);
+        const modelIdSet = new Set(models.map((model) => model.id));
+        const now = Date.now();
+
+        deleteDefaultsStmt.run(userId);
+        deleteModelsStmt.run(userId);
+
+        for (const model of models) {
+          insertModelStmt.run(
+            userId,
+            model.id,
+            model.modelType,
+            model.name,
+            model.provider,
+            model.apiProtocol,
+            model.apiKey,
+            model.apiUrl,
+            model.model,
+            model.isDefault,
+            model.chatParams,
+            model.imageParams,
+            now,
+            now,
+          );
+        }
+
+        const scenarioDefaults = settings.scenarioModelDefaults;
+        if (scenarioDefaults && typeof scenarioDefaults === "object" && !Array.isArray(scenarioDefaults)) {
+          for (const [scenario, rawModelId] of Object.entries(scenarioDefaults as Record<string, unknown>)) {
+            if (!AI_SCENARIOS.has(scenario)) {
+              continue;
+            }
+            const modelId = toNonEmptyString(rawModelId);
+            if (!modelId || !modelIdSet.has(modelId)) {
+              continue;
+            }
+            insertScenarioStmt.run(userId, scenario, modelId, now);
+          }
+        }
+      }
+
+      markMigration("backfill_user_ai_models_from_user_settings_v1");
     }
 
     // ── skill_versions table ────────────────────────────────────────────────

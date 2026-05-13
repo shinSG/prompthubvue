@@ -26,6 +26,32 @@ const JSON_HEADERS = {
 
 let installed = false;
 
+type BridgeAIModelConfig = {
+  id: string;
+  type: 'chat' | 'image';
+  name?: string;
+  provider: string;
+  apiProtocol: 'openai' | 'gemini' | 'anthropic';
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  isDefault?: boolean;
+  chatParams?: Record<string, unknown>;
+  imageParams?: Record<string, unknown>;
+};
+
+type BridgeScenarioDefaults = Partial<Record<'quickAdd' | 'promptTest' | 'imageTest' | 'translation', string>>;
+
+type BridgeSettingsPayload = Partial<Settings> & {
+  aiProvider?: string;
+  aiApiProtocol?: 'openai' | 'gemini' | 'anthropic';
+  aiApiKey?: string;
+  aiApiUrl?: string;
+  aiModel?: string;
+  aiModels?: BridgeAIModelConfig[];
+  scenarioModelDefaults?: BridgeScenarioDefaults;
+};
+
 function getPlatform(): string {
   const ua = navigator.userAgent.toLowerCase();
   if (ua.includes('mac')) return 'darwin';
@@ -211,6 +237,84 @@ async function requestAiStream(
   };
 }
 
+async function getModelConfigs(): Promise<{
+  models: BridgeAIModelConfig[];
+  scenarioModelDefaults: BridgeScenarioDefaults;
+}> {
+  return apiJson<{ models: BridgeAIModelConfig[]; scenarioModelDefaults: BridgeScenarioDefaults }>(
+    '/api/model-configs',
+  );
+}
+
+async function saveModelConfigsFromSettings(settings: BridgeSettingsPayload): Promise<void> {
+  const nextModels = Array.isArray(settings.aiModels) ? settings.aiModels : undefined;
+  const nextDefaults = settings.scenarioModelDefaults;
+
+  if (!nextModels && !nextDefaults) {
+    return;
+  }
+
+  const current = await getModelConfigs();
+
+  if (nextModels) {
+    const nextIds = new Set(nextModels.map((model) => model.id));
+    const currentIds = new Set(current.models.map((model) => model.id));
+
+    for (const model of nextModels) {
+      await apiJsonBody(`/api/model-configs/${encodeURIComponent(model.id)}`, 'PUT', {
+        id: model.id,
+        type: model.type,
+        name: model.name,
+        provider: model.provider,
+        apiProtocol: model.apiProtocol,
+        apiKey: model.apiKey,
+        apiUrl: model.apiUrl,
+        model: model.model,
+        isDefault: !!model.isDefault,
+        chatParams: model.chatParams,
+        imageParams: model.imageParams,
+      });
+    }
+
+    for (const existingModel of current.models) {
+      if (!nextIds.has(existingModel.id) && currentIds.has(existingModel.id)) {
+        await apiJsonBody(`/api/model-configs/${encodeURIComponent(existingModel.id)}`, 'DELETE');
+      }
+    }
+  }
+
+  if (nextDefaults) {
+    const scenarios: Array<keyof BridgeScenarioDefaults> = [
+      'quickAdd',
+      'promptTest',
+      'imageTest',
+      'translation',
+    ];
+
+    for (const scenario of scenarios) {
+      await apiJsonBody('/api/model-configs/scenario-defaults', 'PUT', {
+        scenario,
+        modelId: nextDefaults[scenario] ?? null,
+      });
+    }
+  }
+}
+
+function stripModelConfigFields(settings: BridgeSettingsPayload): Partial<Settings> {
+  const {
+    aiProvider: _aiProvider,
+    aiApiProtocol: _aiApiProtocol,
+    aiApiKey: _aiApiKey,
+    aiApiUrl: _aiApiUrl,
+    aiModel: _aiModel,
+    aiModels: _aiModels,
+    scenarioModelDefaults: _scenarioModelDefaults,
+    ...persistable
+  } = settings;
+
+  return persistable;
+}
+
 export function installDesktopBridge(): void {
   if (installed) {
     return;
@@ -354,9 +458,28 @@ export function installDesktopBridge(): void {
       ) => {},
     },
     settings: {
-      get: () => apiJson<Settings>('/api/settings'),
-      set: (settings: Partial<Settings>) =>
-        apiOk('/api/settings', 'PUT', settings),
+      get: async () => {
+        const [settings, modelConfigs] = await Promise.all([
+          apiJson<Settings>('/api/settings'),
+          getModelConfigs(),
+        ]);
+
+        return {
+          ...settings,
+          aiModels: modelConfigs.models,
+          scenarioModelDefaults: modelConfigs.scenarioModelDefaults,
+        } as Settings;
+      },
+      set: async (settings: BridgeSettingsPayload) => {
+        await saveModelConfigsFromSettings(settings);
+
+        const plainSettings = stripModelConfigFields(settings);
+        if (Object.keys(plainSettings).length === 0) {
+          return true;
+        }
+
+        return apiOk('/api/settings', 'PUT', plainSettings);
+      },
     },
     io: {},
     ai: {
