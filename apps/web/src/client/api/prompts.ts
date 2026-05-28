@@ -52,6 +52,7 @@ async function requestJson<T>(url: string, options: RequestInit, fallbackMessage
 export interface PromptListQuery {
   scope?: 'private' | 'shared' | 'all';
   keyword?: string;
+  folderId?: string;
   isFavorite?: boolean;
   sortBy?: 'title' | 'createdAt' | 'updatedAt' | 'usageCount';
   sortOrder?: 'asc' | 'desc';
@@ -61,6 +62,7 @@ function buildQueryString(query: PromptListQuery): string {
   const params = new URLSearchParams();
   if (query.scope) params.set('scope', query.scope);
   if (query.keyword) params.set('keyword', query.keyword);
+  if (query.folderId) params.set('folderId', query.folderId);
   if (query.isFavorite !== undefined) params.set('isFavorite', String(query.isFavorite));
   if (query.sortBy) params.set('sortBy', query.sortBy);
   if (query.sortOrder) params.set('sortOrder', query.sortOrder);

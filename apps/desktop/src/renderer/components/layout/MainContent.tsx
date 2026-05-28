@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef, Children, isValidElement, cloneElement, memo, lazy, Suspense, type CSSProperties } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Children, isValidElement, cloneElement, lazy, Suspense, type CSSProperties } from 'react';
 import { flushSync } from 'react-dom';
 import { usePromptStore, ViewMode } from '../../stores/prompt.store';
 import { useFolderStore } from '../../stores/folder.store';
@@ -15,7 +15,7 @@ import { RulesManager } from '../rules/RulesManager';
 // Lazy load SkillManager for better initial load performance
 // 懒加载 SkillManager 以提升初始加载性能
 const SkillManager = lazy(() => import('../skill/SkillManager').then(m => ({ default: m.SkillManager })));
-import { StarIcon, CopyIcon, HistoryIcon, HashIcon, SparklesIcon, EditIcon, TrashIcon, CheckIcon, PlayIcon, LoaderIcon, XIcon, GitCompareIcon, ClockIcon, GlobeIcon, PinIcon, MessageSquareTextIcon, ImageIcon, DownloadIcon, SaveIcon, ZoomInIcon, Share2Icon, PaperclipIcon } from 'lucide-react';
+import { StarIcon, CopyIcon, HistoryIcon, HashIcon, SparklesIcon, EditIcon, TrashIcon, CheckIcon, PlayIcon, LoaderIcon, XIcon, GitCompareIcon, ClockIcon, GlobeIcon, PinIcon, MessageSquareTextIcon, ImageIcon, DownloadIcon, SaveIcon, ZoomInIcon, Share2Icon, PaperclipIcon, FolderIcon } from 'lucide-react';
 import { EditPromptModal, VersionHistoryModal, VariableInputModal, PromptListHeader, PromptTableView, AiTestModal, PromptDetailModal, PromptGalleryView, PromptKanbanView } from '../prompt';
 import type { OutputFormatConfig, VariableInputImageAttachment } from '../prompt/VariableInputModal';
 import { ContextMenu, ContextMenuItem } from '../ui/ContextMenu';
@@ -49,7 +49,6 @@ const LARGE_PROMPT_LIST_THRESHOLD = 160;
 const INITIAL_PROMPT_RENDER_COUNT = 160;
 const PROMPT_RENDER_CHUNK_SIZE = 160;
 const PROMPT_RENDER_CHUNK_DELAY_MS = 24;
-const PROMPT_CARD_INTRINSIC_SIZE = "76px";
 const MAX_AI_TEST_IMAGES = 8;
 const MAX_AI_TEST_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_AI_TEST_IMAGE_MIME_TYPES = new Set([
@@ -121,73 +120,6 @@ function renderHighlightedChildren(children: any, terms: string[], highlightClas
     return cloneElement(child as any, { ...props, children: nextChildren });
   });
 }
-
-// Prompt card component (compact version) - wrapped with React.memo for performance
-// Prompt 卡片组件（紧凑版本）- 使用 React.memo 包装以提升性能
-const PromptCard = memo(function PromptCard({
-  prompt,
-  isSelected,
-  onSelect,
-  onContextMenu,
-  highlightTerms
-}: {
-  prompt: Prompt;
-  isSelected: boolean;
-  onSelect: (e: React.MouseEvent) => void;
-  onContextMenu: (e: React.MouseEvent) => void;
-  highlightTerms: string[];
-}) {
-  const highlightClassName = isSelected
-    ? 'bg-white/20 text-white rounded px-0.5'
-    : 'bg-primary/15 text-primary rounded px-0.5';
-
-  return (
-    <div
-      onClick={onSelect}
-      onContextMenu={onContextMenu}
-      style={{
-        contentVisibility: 'auto',
-        containIntrinsicSize: PROMPT_CARD_INTRINSIC_SIZE,
-      }}
-      className={`
-        w-full text-left px-3 py-2.5 rounded-lg cursor-pointer
-        transition-all duration-200 animate-in fade-in slide-in-from-left-2
-        ${isSelected
-          ? 'bg-primary text-white'
-          : 'prompt-list-card bg-card hover:bg-accent'
-        }
-      `}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {prompt.isPinned && (
-            <PinIcon className={`w-3 h-3 flex-shrink-0 ${isSelected ? 'text-white' : 'text-primary'}`} />
-          )}
-          {/* Prompt type icon - only show for image/media type */}
-          {prompt.promptType === 'image' && (
-            <ImageIcon className={`w-3 h-3 flex-shrink-0 ${isSelected ? 'text-white/70' : 'text-blue-500'}`} />
-          )}
-          <h3
-            className="font-medium text-sm leading-snug break-words line-clamp-2"
-            title={prompt.title}
-          >
-            {renderHighlightedText(prompt.title, highlightTerms, highlightClassName)}
-          </h3>
-        </div>
-        {prompt.isFavorite && (
-          <StarIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isSelected ? 'fill-white text-white' : 'fill-yellow-400 text-yellow-400'
-            }`} />
-        )}
-      </div>
-      {prompt.description && (
-        <p className={`text-xs line-clamp-2 break-words mt-0.5 ${isSelected ? 'text-white/70' : 'text-muted-foreground'
-          }`}>
-          {renderHighlightedText(prompt.description, highlightTerms, highlightClassName)}
-        </p>
-      )}
-    </div>
-  );
-});
 
 type DetailInlineEditDraft = {
   title: string;
@@ -1643,34 +1575,107 @@ function PromptSkillMainContent() {
           {/* 列表头部：排序 + 视图切换 */}
           <PromptListHeader count={sortedPrompts.length} />
 
-          {/* List content */}
-          {/* 列表内容 */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Card grid content */}
+          <div className="flex-1 overflow-y-auto p-3">
             {sortedPrompts.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                  <SparklesIcon className="w-8 h-8 text-primary" />
+                <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-4">
+                  <SparklesIcon className="w-8 h-8 text-blue-500" />
                 </div>
-                <p className="text-lg font-medium text-foreground mb-1">{t('prompt.noPrompts')}</p>
-                <p className="text-sm text-muted-foreground">{t('prompt.addFirst')}</p>
+                <p className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">{t('prompt.noPrompts')}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t('prompt.addFirst')}</p>
               </div>
             ) : (
-              <div className="p-3 space-y-2">
-                {visiblePrompts.map((prompt) => (
-                  <PromptCard
-                    key={prompt.id}
-                    prompt={prompt}
-                    isSelected={selectedPromptIdSet.has(prompt.id)}
-                    onSelect={(e) => handleSelectPrompt(prompt, e)}
-                    onContextMenu={(e) => handleContextMenu(e, prompt)}
-                    highlightTerms={highlightTerms}
-                  />
-                ))}
+              <div className="grid grid-cols-1 gap-3">
+                {visiblePrompts.map((prompt) => {
+                  const preferEnglish = !(i18n.language || '').toLowerCase().startsWith('zh');
+                  const sysPreview = preferEnglish ? (prompt.systemPromptEn || prompt.systemPrompt || '') : (prompt.systemPrompt || '');
+                  const userPreview = preferEnglish ? (prompt.userPromptEn || prompt.userPrompt || '') : (prompt.userPrompt || '');
+                  const regex = /\{\{([^}]+)\}\}/g;
+                  const vars = new Set<string>();
+                  let m: RegExpExecArray | null;
+                  const allText = (prompt.systemPrompt || '') + prompt.userPrompt + (prompt.systemPromptEn || '') + (prompt.userPromptEn || '');
+                  while ((m = regex.exec(allText)) !== null) { vars.add(m[1]); }
+                  const varList = Array.from(vars).slice(0, 4);
+                  const varCount = vars.size;
+
+                  return (
+                    <div
+                      key={prompt.id}
+                      onClick={(e) => handleSelectPrompt(prompt, e)}
+                      onContextMenu={(e) => handleContextMenu(e, prompt)}
+                      className={`
+                        bg-white dark:bg-gray-900 rounded-xl border cursor-pointer
+                        transition-all duration-200 hover:shadow-md
+                        ${selectedPromptIdSet.has(prompt.id)
+                          ? 'border-blue-400 dark:border-blue-500 shadow-md ring-1 ring-blue-200 dark:ring-blue-800'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <EditIcon className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                          <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate" title={prompt.title}>
+                            {prompt.title}
+                          </h3>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite(prompt.id); }}
+                          className="flex-shrink-0 p-0.5"
+                        >
+                          <StarIcon className={`w-3.5 h-3.5 ${prompt.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} />
+                        </button>
+                      </div>
+                      {varCount > 0 && (
+                        <div className="flex flex-wrap gap-1 px-3 pb-1.5">
+                          {varList.map((v) => (
+                            <span key={v} className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/20 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                              {`{{${v}}}`}
+                            </span>
+                          ))}
+                          {varCount > 4 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-[10px] text-gray-500">
+                              +{varCount - 4}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="px-3 pb-1 space-y-0.5">
+                        {sysPreview && (
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 line-clamp-1" title={sysPreview}>
+                            <span className="font-medium">{t('prompt.systemPrompt') || '系统提示词'}</span> {sysPreview}
+                          </p>
+                        )}
+                        {userPreview && (
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-2" title={userPreview}>
+                            <span className="font-medium">{t('prompt.userPrompt') || '用户提示词'}</span> {userPreview}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 dark:border-gray-800">
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-500 min-w-0">
+                          {folders.find(f => f.id === prompt.folderId) && (
+                            <span className="flex items-center gap-0.5 truncate">
+                              <FolderIcon className="w-2.5 h-2.5 flex-shrink-0" />
+                              {folders.find(f => f.id === prompt.folderId)?.name}
+                            </span>
+                          )}
+                          <span className="flex-shrink-0">{new Date(prompt.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button onClick={(e) => { e.stopPropagation(); handleCopyPrompt(prompt); }} className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 px-0.5">{t('prompt.copy') || '复制'}</button>
+                          <button onClick={(e) => { e.stopPropagation(); setEditingPrompt(prompt); }} className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 px-0.5">{t('prompt.edit') || '编辑'}</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleAiTestFromTable(prompt); }} className="text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-700 px-0.5">AI{t('prompt.aiTest') || '测试'}</button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
           {/* Drag-to-resize handle for the prompt list pane (#119) */}
-          {/* Prompt 列表栏的拖拽手柄 (#119) */}
           <div className="absolute inset-y-0 right-0 z-10 flex">
             <ColumnResizer
               currentWidth={promptListPaneWidth}

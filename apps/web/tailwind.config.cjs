@@ -3,7 +3,7 @@ module.exports = {
   darkMode: ['class'],
   content: [
     './index.html',
-    './src/client/**/*.{ts,tsx}',
+    './src/client/**/*.{ts,tsx,vue}',
     '../desktop/src/renderer/**/*.{ts,tsx}',
     '../desktop/src/renderer/index.html',
   ],

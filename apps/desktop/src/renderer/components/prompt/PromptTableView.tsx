@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StarIcon, CopyIcon, PlayIcon, EditIcon, TrashIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, FolderIcon, Trash2Icon } from 'lucide-react';
+import { StarIcon, ChevronLeftIcon, ChevronRightIcon, FolderIcon, Trash2Icon } from 'lucide-react';
 import type { Prompt } from '@prompthub/shared/types';
 import { useFolderStore } from '../../stores/folder.store';
 import { useTableConfig, type ColumnConfig } from '../../hooks/useTableConfig';
@@ -312,16 +312,16 @@ export function PromptTableView({
             onReset={resetToDefaults}
           />
         </div>
-        <div className="rounded-xl border border-border overflow-x-auto app-wallpaper-panel">
-          <table className="w-full text-sm min-w-[1000px]">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto bg-white dark:bg-gray-900">
+          <table className="w-full text-sm min-w-[900px]">
             <thead className="sticky top-0 z-20">
-              <tr className="bg-muted/30 dark:bg-muted/20 border-b border-border">
+              <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                 {getVisibleColumns().map((column) => {
                   // Render different content based on column id
                   // 根据列 ID 渲染不同内容
                   if (column.id === 'checkbox') {
                     return (
-                      <th key={column.id} className="px-4 py-3" style={{ width: column.width }}>
+                      <th key={column.id} className="px-4 py-2.5 text-left" style={{ width: column.width }}>
                         <Checkbox
                           checked={currentPrompts.length > 0 && selectedIds.size === currentPrompts.length}
                           onChange={toggleSelectAll}
@@ -329,16 +329,15 @@ export function PromptTableView({
                       </th>
                     );
                   }
-                  
+
                   if (column.id === 'actions') {
                     return (
                       <th
                         key={column.id}
-                        className="sticky right-0 z-40 p-0 app-wallpaper-surface-strong shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.15)]"
+                        className="sticky right-0 z-40 bg-gray-50 dark:bg-gray-800/50"
                         style={{ width: column.width }}
                       >
-                        <div className="absolute inset-0 bg-muted/30 dark:bg-muted/20" />
-                        <div className="relative flex items-center justify-center px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">
+                        <div className="flex items-center justify-center px-4 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
                           <span>{t('prompt.actions')}</span>
                         </div>
                       </th>
@@ -353,7 +352,7 @@ export function PromptTableView({
                       key={column.id}
                       column={column}
                       onResize={updateColumnWidth}
-                      className={`${isCenter ? 'text-center' : 'text-left'} px-4 py-3 font-medium text-muted-foreground whitespace-nowrap`}
+                      className={`${isCenter ? 'text-center' : 'text-left'} px-4 py-2.5 font-medium text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap`}
                     >
                       {t(column.label)}
                     </ResizableHeader>
@@ -365,26 +364,26 @@ export function PromptTableView({
               {currentPrompts.map((prompt) => {
                 const isSelected = selectedIds.has(prompt.id);
                 const aiContent = prompt.lastAiResponse || aiResults[prompt.id] || '';
-                
+
                 // Helper to render cell content based on column id
                 // 根据列 ID 渲染单元格内容的辅助函数
                 const renderCell = (column: ColumnConfig) => {
                   const colWidth = { width: column.width, minWidth: column.minWidth };
-                  
+
                   switch (column.id) {
                     case 'checkbox':
                       return (
-                        <td key={column.id} className="px-4 py-3" style={colWidth}>
+                        <td key={column.id} className="px-4 py-2.5" style={colWidth}>
                           <Checkbox checked={isSelected} onChange={() => toggleSelect(prompt.id)} />
                         </td>
                       );
-                    
+
                     case 'title':
                       return (
-                        <td key={column.id} className="px-4 py-3" style={colWidth}>
+                        <td key={column.id} className="px-4 py-2.5" style={colWidth}>
                           <button
                             onClick={() => onViewDetail(prompt)}
-                            className="font-medium text-primary hover:text-primary/80 hover:underline truncate text-left block"
+                            className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline truncate text-left block text-sm"
                             style={{ maxWidth: column.width - 32 }}
                             title={prompt.title}
                           >
@@ -395,9 +394,9 @@ export function PromptTableView({
 
                     case 'description':
                       return (
-                        <td key={column.id} className="px-4 py-3" style={colWidth}>
-                          <span 
-                            className="text-xs text-muted-foreground truncate block" 
+                        <td key={column.id} className="px-4 py-2.5" style={colWidth}>
+                          <span
+                            className="text-xs text-gray-500 dark:text-gray-400 truncate block"
                             style={{ maxWidth: column.width - 32 }}
                             title={prompt.description}
                           >
@@ -408,9 +407,9 @@ export function PromptTableView({
 
                     case 'systemPrompt':
                       return (
-                        <td key={column.id} className="px-4 py-3" style={colWidth}>
-                          <span 
-                            className="text-xs text-muted-foreground truncate block" 
+                        <td key={column.id} className="px-4 py-2.5" style={colWidth}>
+                          <span
+                            className="text-xs text-gray-500 dark:text-gray-400 truncate block"
                             style={{ maxWidth: column.width - 32 }}
                             title={preferEnglish ? (prompt.systemPromptEn || prompt.systemPrompt) : prompt.systemPrompt}
                           >
@@ -418,12 +417,12 @@ export function PromptTableView({
                           </span>
                         </td>
                       );
-                    
+
                     case 'userPrompt':
                       return (
-                        <td key={column.id} className="px-4 py-3" style={colWidth}>
-                          <span 
-                            className="text-xs text-muted-foreground truncate block" 
+                        <td key={column.id} className="px-4 py-2.5" style={colWidth}>
+                          <span
+                            className="text-xs text-gray-500 dark:text-gray-400 truncate block"
                             style={{ maxWidth: column.width - 32 }}
                             title={preferEnglish ? (prompt.userPromptEn || prompt.userPrompt) : prompt.userPrompt}
                           >
@@ -431,12 +430,12 @@ export function PromptTableView({
                           </span>
                         </td>
                       );
-                    
+
                     case 'aiResponse':
                       return (
-                        <td key={column.id} className="px-4 py-3" style={colWidth}>
-                          <span 
-                            className="text-xs text-muted-foreground truncate block" 
+                        <td key={column.id} className="px-4 py-2.5" style={colWidth}>
+                          <span
+                            className="text-xs text-gray-500 dark:text-gray-400 truncate block"
                             style={{ maxWidth: column.width - 32 }}
                             title={aiContent}
                           >
@@ -444,38 +443,38 @@ export function PromptTableView({
                           </span>
                         </td>
                       );
-                    
+
                     case 'variables':
                       return (
-                        <td key={column.id} className="px-4 py-3 text-center" style={colWidth}>
-                          <span className={`text-xs ${getVariableCount(prompt) > 0 ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                        <td key={column.id} className="px-4 py-2.5 text-center" style={colWidth}>
+                          <span className={`text-xs ${getVariableCount(prompt) > 0 ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
                             {getVariableCount(prompt) || '-'}
                           </span>
                         </td>
                       );
-                    
+
                     case 'usageCount':
                       return (
-                        <td key={column.id} className="px-4 py-3 text-center text-muted-foreground text-xs" style={colWidth}>
+                        <td key={column.id} className="px-4 py-2.5 text-center text-gray-500 dark:text-gray-400 text-xs" style={colWidth}>
                           {prompt.usageCount || 0}
                         </td>
                       );
 
                     case 'tags':
                       return (
-                        <td key={column.id} className="px-4 py-3" style={colWidth}>
+                        <td key={column.id} className="px-4 py-2.5" style={colWidth}>
                           <div className="flex flex-wrap gap-1 max-w-full overflow-hidden">
                             {prompt.tags && prompt.tags.length > 0 ? (
                               prompt.tags.slice(0, 2).map((tag) => (
-                                <span key={tag} className="px-1.5 py-0.5 rounded-md bg-muted text-[10px] text-muted-foreground truncate max-w-[80px]">
+                                <span key={tag} className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-[10px] text-gray-500 dark:text-gray-400 truncate max-w-[80px]">
                                   {tag}
                                 </span>
                               ))
                             ) : (
-                              <span className="text-xs text-muted-foreground/50">-</span>
+                              <span className="text-xs text-gray-300 dark:text-gray-600">-</span>
                             )}
                             {prompt.tags && prompt.tags.length > 2 && (
-                              <span className="text-[10px] text-muted-foreground/50">+{prompt.tags.length - 2}</span>
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500">+{prompt.tags.length - 2}</span>
                             )}
                           </div>
                         </td>
@@ -483,89 +482,88 @@ export function PromptTableView({
 
                     case 'updatedAt':
                       return (
-                        <td key={column.id} className="px-4 py-3 text-xs text-muted-foreground" style={colWidth}>
+                        <td key={column.id} className="px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500" style={colWidth}>
                           <span title={new Date(prompt.updatedAt).toLocaleString()}>
                             {new Date(prompt.updatedAt).toLocaleDateString()}
                           </span>
                         </td>
                       );
-                    
+
                     case 'actions':
                       return (
-                        <td 
+                        <td
                           key={column.id}
-                           className="sticky right-0 z-30 p-0 app-wallpaper-surface-strong shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.15)]"
+                          className="sticky right-0 z-30 bg-white dark:bg-gray-900"
                           style={colWidth}
                         >
-                          {isSelected && <div className="absolute inset-0 bg-primary/5 pointer-events-none" />}
                           <div
-                            className="relative flex items-center justify-center gap-0.5 px-2 py-3"
+                            className="flex items-center justify-center gap-1 px-2 py-2"
                             onClick={(e) => e.stopPropagation()}
                           >
                             {/* Copy */}
                             <button
                               onClick={() => handleCopy(prompt)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors px-1"
                               title={t('prompt.copy')}
                             >
                               {copiedId === prompt.id ? (
-                                <CheckIcon className="w-4 h-4 text-green-500" />
+                                <span className="text-green-500">{t('prompt.copied') || '已复制'}</span>
                               ) : (
-                                <CopyIcon className="w-4 h-4" />
+                                <span>{t('prompt.copy') || '复制'}</span>
                               )}
                             </button>
 
                             {/* AI test */}
                             <button
                               onClick={() => onAiTest(prompt)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors px-1"
                               title={t('prompt.aiTest')}
                             >
-                              <PlayIcon className="w-4 h-4" />
+                              <span>AI{t('prompt.aiTest') || '测试'}</span>
                             </button>
 
                             {/* Version history */}
                             <button
                               onClick={() => onVersionHistory(prompt)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors px-1"
                               title={t('prompt.history')}
                             >
-                              <HistoryIcon className="w-4 h-4" />
+                              <span>{t('prompt.history') || '历史版本'}</span>
                             </button>
 
                             {/* Favorite */}
                             <button
                               onClick={() => onToggleFavorite(prompt.id)}
-                              className={`p-1.5 rounded-lg transition-colors ${prompt.isFavorite
-                                ? 'text-yellow-500 hover:bg-yellow-500/10'
-                                : 'text-muted-foreground hover:text-yellow-500 hover:bg-accent'
+                              className={`text-xs transition-colors px-1 ${prompt.isFavorite
+                                ? 'text-yellow-500'
+                                : 'text-blue-600 dark:text-blue-400 hover:text-blue-700'
                                 }`}
                               title={prompt.isFavorite ? t('nav.favorites') : t('prompt.addToFavorites')}
                             >
-                              <StarIcon className={`w-4 h-4 ${prompt.isFavorite ? 'fill-current' : ''}`} />
+                              <span>{prompt.isFavorite ? (t('nav.favorites') || '收藏') : (t('prompt.addToFavorites') || '收藏')}</span>
                             </button>
 
                             {/* Edit */}
                             <button
                               onClick={() => onEdit(prompt)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors px-1"
                               title={t('prompt.edit')}
                             >
-                              <EditIcon className="w-4 h-4" />
+                              <span>{t('prompt.edit') || '编辑'}</span>
                             </button>
 
                             {/* Delete */}
                             <button
                               onClick={() => onDelete(prompt)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                              className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 transition-colors px-1"
                               title={t('prompt.delete')}
                             >
-                              <TrashIcon className="w-4 h-4" />
+                              <span>{t('prompt.delete') || '删除'}</span>
                             </button>
                           </div>
                         </td>
                       );
-                    
+
                     default:
                       return null;
                   }
@@ -575,7 +573,7 @@ export function PromptTableView({
                   <tr
                     key={prompt.id}
                     onContextMenu={(e) => onContextMenu(e, prompt)}
-                    className={`border-b border-border/50 last:border-b-0 hover:bg-accent/50 dark:hover:bg-accent/20 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
+                    className={`border-b border-gray-100 dark:border-gray-800 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
                   >
                     {getVisibleColumns().map(renderCell)}
                   </tr>
