@@ -308,10 +308,11 @@ Web 服务提供生产 Dockerfile：`apps/web/Dockerfile`。
 - 多阶段构建
 - Builder 阶段安装依赖并构建 client + server
 - Runner 阶段只安装生产依赖
+- 单个 Node 进程同时提供后端 API 与构建后的前端静态资源
 - 默认 `PORT=3000`
-- 默认 `DATA_DIR=/app/data`
+- 默认 `DATA_ROOT=/app`
 - 暴露 `3000`
-- 挂载 `/app/data`
+- 挂载 `/app/data`、`/app/config`、`/app/logs`、`/app/backups`
 - 内置 `/health` 健康检查
 
 ### 10.2 Docker Compose

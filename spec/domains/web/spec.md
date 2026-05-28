@@ -21,6 +21,12 @@
 - Web 的架构与数据布局参考 `spec/architecture/data-layout-v0.5.5-zh.md`。
 - Web 的长期实施规划与布局迁移历史保存在 `spec/changes/legacy/docs-08-todo/`。
 
+### 4. Authentication Session Source
+
+- 浏览器环境中的 web 登录态以服务端签发的 HttpOnly JWT cookie 为真实会话来源。
+- 鉴权链路必须允许在 `Authorization` header 失效时回退校验 cookie，避免残留 bearer token 覆盖有效 cookie 会话。
+- 前端启动时的登录态恢复、刷新与登出应优先使用 cookie-backed auth 请求，而不是要求模拟或显式传入 bearer token。
+
 ## Stable Scenarios
 
 ### Scenario: Contributor updates web architecture

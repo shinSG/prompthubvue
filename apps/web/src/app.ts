@@ -5,6 +5,7 @@ import { logger } from './middleware/logger.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { auth as authMiddleware } from './middleware/auth.js';
 import { securityHeaders } from './middleware/security-headers.js';
+import { ErrorCode } from './utils/response.js';
 import authRoutes from './routes/auth.js';
 import promptRoutes from './routes/prompts.js';
 import folderRoutes from './routes/folders.js';
@@ -36,6 +37,15 @@ export function createApp(): Hono {
 
   const protectedApi = new Hono();
   protectedApi.use('*', authMiddleware());
+
+  // Prevent unmatched /api/* routes from falling through to the SPA catch-all
+  protectedApi.notFound((c) => {
+    return c.json(
+      { error: { code: ErrorCode.NOT_FOUND, message: `Not found: ${c.req.method} ${c.req.path}` } },
+      404,
+    );
+  });
+
   protectedApi.route('/prompts', promptRoutes);
   protectedApi.route('/folders', folderRoutes);
   protectedApi.route('/skills', skillRoutes);

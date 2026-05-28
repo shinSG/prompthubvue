@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
-    "lint": "eslint . --ext ts,tsx,mts --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext ts,tsx,mts,vue --report-unused-disable-directives --max-warnings 0",
     "test:smoke": "tsx scripts/smoke.mts"
   },
   "dependencies": {
@@ -36,6 +36,9 @@
     "react-dom": "^18.3.0",
     "react-i18next": "^15.0.0",
     "react-router-dom": "^7.14.0",
+    "vue": "^3.5.35",
+    "vue-i18n": "^11.4.4",
+    "vue-router": "^5.0.7",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -49,7 +52,10 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "@vitejs/plugin-vue": "^6.0.7",
     "@vitest/coverage-v8": "^2.0.0",
+    "@vue/test-utils": "^2.4.10",
+    "@vue/tsconfig": "^0.9.1",
     "autoprefixer": "^10.4.22",
     "concurrently": "^9.0.0",
     "eslint": "^9.0.0",

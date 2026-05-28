@@ -18,7 +18,7 @@ import type {
   UpdateSkillParams,
 } from '@prompthub/shared/types';
 import { fetchWithAuthRetry } from '../api/auth-session';
-import i18n from '../i18n';
+import { i18next } from '../i18n';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -77,7 +77,10 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
   }
 
   if (!payload || !('data' in payload)) {
-    throw new Error('Malformed API response');
+    const bodyPreview = JSON.stringify(payload).slice(0, 200);
+    throw new Error(
+      `Malformed API response: status=${response.status} url=${response.url} body=${bodyPreview}`,
+    );
   }
 
   return payload.data as T;
@@ -539,16 +542,16 @@ export function installDesktopBridge(): void {
       return false;
     },
     getDataPath: async () =>
-      i18n.t(
+      i18next.t(
         'settings.webDataPathPlaceholder',
         'PromptHub Web Self-Hosted Data Directory',
       ),
     getDataPathStatus: async () => ({
-      currentPath: i18n.t(
+      currentPath: i18next.t(
         'settings.webDataPathPlaceholder',
         'PromptHub Web Self-Hosted Data Directory',
       ),
-      configuredPath: i18n.t(
+      configuredPath: i18next.t(
         'settings.webDataPathPlaceholder',
         'PromptHub Web Self-Hosted Data Directory',
       ),

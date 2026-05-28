@@ -448,7 +448,7 @@ describe('web auth routes', () => {
       expect(response.status).toBe(401);
       const payload = await response.json() as { error: { code: string; message: string } };
       expect(payload.error.code).toBe('UNAUTHORIZED');
-      expect(payload.error.message).toBe('Missing or invalid Authorization header');
+      expect(payload.error.message).toBe('Missing authentication token');
     } finally {
       fs.rmSync(dataDir, { recursive: true, force: true });
     }

@@ -25,26 +25,39 @@ export function auth(): MiddlewareHandler {
     const tokenFromHeader = header?.startsWith('Bearer ')
       ? header.slice(7)
       : null;
-    const token = tokenFromHeader ?? getAccessTokenFromCookie(c) ?? null;
+    const tokenFromCookie = getAccessTokenFromCookie(c) ?? null;
 
-    if (!token) {
+    if (!tokenFromHeader && !tokenFromCookie) {
       return c.json(
-        { error: { code: ErrorCode.UNAUTHORIZED, message: 'Missing or invalid Authorization header' } },
+        { error: { code: ErrorCode.UNAUTHORIZED, message: 'Missing authentication token' } },
         401,
       );
     }
 
-    try {
-      const { userId, role } = await authService.verifyAccessToken(token);
-      c.set('userId', userId);
-      c.set('role', role);
+    const verificationCandidates = tokenFromHeader && tokenFromCookie && tokenFromHeader !== tokenFromCookie
+      ? [tokenFromHeader, tokenFromCookie]
+      : [tokenFromHeader ?? tokenFromCookie];
 
-      await next();
-    } catch {
-      return c.json(
-        { error: { code: ErrorCode.UNAUTHORIZED, message: 'Token expired or invalid' } },
-        401,
-      );
+    for (const candidate of verificationCandidates) {
+      if (!candidate) {
+        continue;
+      }
+
+      try {
+        const { userId, role } = await authService.verifyAccessToken(candidate);
+        c.set('userId', userId);
+        c.set('role', role);
+
+        await next();
+        return;
+      } catch {
+        // Try the next source (Authorization header or cookie) before failing.
+      }
     }
+
+    return c.json(
+      { error: { code: ErrorCode.UNAUTHORIZED, message: 'Token expired or invalid' } },
+      401,
+    );
   };
 }

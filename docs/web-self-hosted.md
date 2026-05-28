@@ -116,6 +116,14 @@ Useful root-level commands:
 
 `apps/web` already includes a production `Dockerfile` and ready-to-use compose files.
 
+If you want a Dockerfile pinned to `aarch64` / `linux/arm64`, use `apps/web/Dockerfile.aarch64`.
+
+The production image is a single-container deployment artifact:
+
+- the backend Hono server runs on port `3000`
+- the same Node process also serves the built web client from `dist/client`
+- runtime data is rooted at `DATA_ROOT` and typically persisted via mounted `data/`, `config/`, `logs/`, and `backups/` paths
+
 When a release tag is built in CI, PromptHub also publishes a container image to GHCR:
 
 - `ghcr.io/legeling/prompthub-web:<version-tag>`
@@ -141,6 +149,12 @@ Start the service:
 docker compose up -d --build
 ```
 
+Build the dedicated ARM64 image manually:
+
+```bash
+docker build -f apps/web/Dockerfile.aarch64 -t prompthub-web:arm64 .
+```
+
 Default access URL:
 
 - `http://localhost:3871`
@@ -156,7 +170,11 @@ docker run -d \
   -p 3871:3000 \
   -e JWT_SECRET='replace-with-a-random-secret-at-least-32-chars' \
   -e ALLOW_REGISTRATION=false \
+  -e DATA_ROOT=/app \
   -v "$(pwd)/apps/web/data:/app/data" \
+  -v "$(pwd)/apps/web/config:/app/config" \
+  -v "$(pwd)/apps/web/logs:/app/logs" \
+  -v "$(pwd)/apps/web/backups:/app/backups" \
   ghcr.io/legeling/prompthub-web:latest
 ```
 

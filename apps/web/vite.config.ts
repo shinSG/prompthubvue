@@ -1,16 +1,25 @@
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import vue from '@vitejs/plugin-vue';
 
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '../../package.json'), 'utf-8'));
-const serverPort = process.env.PORT ?? '3000';
+const serverPort = process.env.PORT ?? '3001';
 
 export default defineConfig({
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version),
   },
-  plugins: [react()],
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          // Allow importing React desktop components
+          isCustomElement: () => false,
+        },
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@desktop-renderer-app': path.resolve(

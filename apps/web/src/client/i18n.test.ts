@@ -18,29 +18,29 @@ describe('client i18n initialization', () => {
   it('uses English for English browser locales', async () => {
     const i18n = await loadI18nFor('en-US');
 
-    expect(i18n.language).toBe('en');
+    expect(i18n.global.locale.value).toBe('en');
   });
 
   it('maps simplified Chinese browser locales to zh', async () => {
     const i18n = await loadI18nFor('zh-CN');
 
-    expect(i18n.language).toBe('zh');
+    expect(i18n.global.locale.value).toBe('zh');
   });
 
   it('maps Traditional Chinese locales to zh-TW', async () => {
-    expect((await loadI18nFor('zh-TW')).language).toBe('zh-TW');
-    expect((await loadI18nFor('zh-HK')).language).toBe('zh-TW');
+    expect((await loadI18nFor('zh-TW')).global.locale.value).toBe('zh-TW');
+    expect((await loadI18nFor('zh-HK')).global.locale.value).toBe('zh-TW');
   });
 
   it('keeps supported non-Chinese locales', async () => {
     const i18n = await loadI18nFor('ja-JP');
 
-    expect(i18n.language).toBe('ja');
+    expect(i18n.global.locale.value).toBe('ja');
   });
 
   it('falls back to English for unsupported locales', async () => {
     const i18n = await loadI18nFor('ko-KR');
 
-    expect(i18n.language).toBe('en');
+    expect(i18n.global.locale.value).toBe('en');
   });
 });

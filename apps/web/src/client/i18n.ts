@@ -1,5 +1,5 @@
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
+import i18next from 'i18next';
+import { createI18n } from 'vue-i18n';
 
 // Desktop locale files – provides all keys used by embedded desktop UI components
 import desktopEn from '../../../desktop/src/renderer/i18n/locales/en.json';
@@ -38,14 +38,15 @@ function deepMerge(base: LocaleObj, override: LocaleObj): LocaleObj {
   return result;
 }
 
-const resources = {
-  en:     { translation: deepMerge(desktopEn as LocaleObj, webEn as LocaleObj) },
-  zh:     { translation: deepMerge(desktopZh as LocaleObj, webZh as LocaleObj) },
-  'zh-TW': { translation: deepMerge(desktopZhTW as LocaleObj, webZhTW as LocaleObj) },
-  ja:     { translation: deepMerge(desktopJa as LocaleObj, webJa as LocaleObj) },
-  fr:     { translation: deepMerge(desktopFr as LocaleObj, webFr as LocaleObj) },
-  de:     { translation: deepMerge(desktopDe as LocaleObj, webDe as LocaleObj) },
-  es:     { translation: deepMerge(desktopEs as LocaleObj, webEs as LocaleObj) },
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const messages: Record<string, any> = {
+  en:     deepMerge(desktopEn as LocaleObj, webEn as LocaleObj),
+  zh:     deepMerge(desktopZh as LocaleObj, webZh as LocaleObj),
+  'zh-TW': deepMerge(desktopZhTW as LocaleObj, webZhTW as LocaleObj),
+  ja:     deepMerge(desktopJa as LocaleObj, webJa as LocaleObj),
+  fr:     deepMerge(desktopFr as LocaleObj, webFr as LocaleObj),
+  de:     deepMerge(desktopDe as LocaleObj, webDe as LocaleObj),
+  es:     deepMerge(desktopEs as LocaleObj, webEs as LocaleObj),
 };
 
 const browserLanguage = navigator.language.startsWith('zh-TW') || navigator.language.startsWith('zh-HK')
@@ -65,20 +66,34 @@ const savedLanguage = (() => {
   return null;
 })();
 
-const supportedLanguages = Object.keys(resources);
+const supportedLanguages = Object.keys(messages);
 const initialLanguage =
   (savedLanguage && supportedLanguages.includes(savedLanguage) ? savedLanguage : null) ??
   (supportedLanguages.includes(browserLanguage) ? browserLanguage : 'en');
 
-i18n
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: initialLanguage,
-    fallbackLng: 'en',
-    interpolation: { escapeValue: false },
-  });
+const i18n = createI18n({
+  legacy: false,
+  locale: initialLanguage,
+  fallbackLocale: 'en',
+  messages,
+  escapeValue: false,
+});
 
-export const changeLanguage = (lang: string) => { i18n.changeLanguage(lang); };
+// Also initialize the core i18next instance for the desktop bridge (install-bridge.ts uses i18n.t())
+i18next.init({
+  resources: Object.fromEntries(
+    Object.entries(messages).map(([lang, msgs]) => [lang, { translation: msgs }])
+  ),
+  lng: initialLanguage,
+  fallbackLng: 'en',
+  interpolation: { escapeValue: false },
+});
 
+export const changeLanguage = (lang: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (i18n.global.locale as any).value = lang;
+  i18next.changeLanguage(lang);
+};
+
+export { i18next };
 export default i18n;
