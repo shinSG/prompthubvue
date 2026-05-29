@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import AppLayout from '../components/AppLayout.vue';
 import WorkspaceHome from './WorkspaceHome.vue';
 import PromptList from './PromptList.vue';
+import SettingsPage from './SettingsPage.vue';
 
 const currentPage = ref('home');
 const selectedFolderId = ref<string | undefined>(undefined);
@@ -22,8 +23,6 @@ function handleBack() {
   <AppLayout :currentPage="currentPage" @navigate="handleNavigate">
     <WorkspaceHome v-if="currentPage === 'home'" @navigate="handleNavigate" />
     <PromptList v-else-if="currentPage === 'prompts'" :folderId="selectedFolderId" @back="handleBack" />
-    <div v-else-if="currentPage === 'settings'" class="flex items-center justify-center h-full text-gray-400">
-      <p>设置页面（待实现）</p>
-    </div>
+    <SettingsPage v-else-if="currentPage === 'settings'" @back="handleBack" />
   </AppLayout>
 </template>

@@ -353,3 +353,74 @@ export async function deleteMedia(token: string, kind: 'images' | 'videos', file
     'Request failed',
   );
 }
+
+export interface ModelConfig {
+  id: string;
+  type: 'chat' | 'image';
+  name?: string;
+  provider: string;
+  apiProtocol: 'openai' | 'gemini' | 'anthropic';
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  isDefault?: boolean;
+}
+
+export interface ModelConfigsResponse {
+  models: ModelConfig[];
+  scenarioModelDefaults: Record<string, string>;
+}
+
+export async function fetchModelConfigs(token: string): Promise<ApiEnvelope<ModelConfigsResponse>> {
+  return requestJson<ModelConfigsResponse>(
+    '/api/model-configs',
+    { headers: getAuthHeaders(token) },
+    'Request failed',
+  );
+}
+
+export async function upsertModelConfig(token: string, model: ModelConfig): Promise<ApiEnvelope<ModelConfig>> {
+  console.log('[API] upsertModelConfig token:', token ? token.substring(0, 20) + '...' : 'null');
+  console.log('[API] upsertModelConfig body:', JSON.stringify(model));
+  const response = await fetchWithAuthRetry(
+    `/api/model-configs/${encodeURIComponent(model.id)}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(model),
+    },
+  );
+  console.log('[API] upsertModelConfig response:', response.status, response.statusText);
+  const payload = await response.json().catch(() => null);
+  console.log('[API] upsertModelConfig payload:', payload);
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || `Request failed: ${response.status}`);
+  }
+  return payload as ApiEnvelope<ModelConfig>;
+}
+
+export async function deleteModelConfig(token: string, modelId: string): Promise<ApiEnvelope<{ ok: true }>> {
+  return requestJson<{ ok: true }>(
+    `/api/model-configs/${encodeURIComponent(modelId)}`,
+    {
+      method: 'DELETE',
+      headers: getAuthHeaders(token),
+    },
+    'Request failed',
+  );
+}
+
+export async function setScenarioDefault(token: string, scenario: string, modelId: string | null): Promise<ApiEnvelope<{ ok: true }>> {
+  return requestJson<{ ok: true }>(
+    '/api/model-configs/scenario-defaults',
+    {
+      method: 'PUT',
+      headers: getAuthHeaders(token, 'application/json'),
+      body: JSON.stringify({ scenario, modelId }),
+    },
+    'Request failed',
+  );
+}
